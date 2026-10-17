@@ -18,7 +18,7 @@ Invoke this skill whenever:
 - The user is starting a complex feature and wants model guidance before proceeding.
 
 ## Execution Steps
-1. Run the local dispatcher in recommendation mode:
+1. Execute the dispatcher command using the `terminal` tool:
    ```bash
    python3 /workspace/hermes_copilot.py --recommend "<user_task_description>"
    ```
