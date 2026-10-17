@@ -165,7 +165,8 @@ def main():
     # 4. Launch Hermes seamlessly with the chosen model
     cmd = [
         "hermes", "chat",
-        "-m", chosen_model
+        "-m", chosen_model,
+        "-q", user_prompt
     ]
     subprocess.run(cmd)
 
