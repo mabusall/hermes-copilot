@@ -176,6 +176,13 @@ curl -X POST http://localhost:11434/api/generate `
 
 ## 9. Maintenance & Lifecycle
 
+### Interactive Shell Access (Optional)
+To open an interactive shell inside the Ollama container (e.g. to run `ollama` commands or test models directly):
+```powershell
+docker exec -it ollama-sandbox-pro bash
+```
+*(Once inside, you can run commands like `ollama list`, `ollama run qwen2.5:0.5b`, or inspect files directly without typing `docker exec` each time).*
+
 ### Resuming After Machine Reboot
 When you reboot Windows, do **not** run `docker run` again. Simply restart the existing container:
 ```powershell
