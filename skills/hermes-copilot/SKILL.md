@@ -6,7 +6,7 @@ author: Engineering Team
 license: MIT
 ---
 
-# Copilot Auto-Router Skill
+# Hermes Copilot Skill
 
 ## Overview
 This skill connects to the lightweight 50ms `qwen2.5:0.5b` router to dynamically inspect all models currently loaded in Ollama and determine the optimal model for a given engineering task.

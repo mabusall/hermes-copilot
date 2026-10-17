@@ -175,13 +175,13 @@ license: MIT
 2. How to present the output to the user.
 ```
 
-### 2. Installing the `copilot-router` Skill
+### 2. Installing the `hermes-copilot` Skill
 To allow Hermes to recommend models dynamically inside the **Chat window** or **Web UI**:
 
 1. Create the skill directory and copy the skill file:
    ```bash
-   mkdir -p /root/.hermes/skills/copilot-router
-   cp -rf /workspace/skills/copilot-router/* /root/.hermes/skills/copilot-router/
+   mkdir -p /root/.hermes/skills/hermes-copilot
+   cp -rf /workspace/skills/hermes-copilot/* /root/.hermes/skills/hermes-copilot/
    ```
 
 2. Verify that Hermes discovers the skill:
@@ -194,7 +194,7 @@ To allow Hermes to recommend models dynamically inside the **Chat window** or **
    ┏━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
    ┃ Name                    ┃ Category ┃ Source  ┃ Trust   ┃ Status  ┃
    ┡━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
-   │ copilot-router          │          │ local   │ local   │ enabled │
+   │ hermes-copilot          │          │ local   │ local   │ enabled │
    └─────────────────────────┴──────────┴─────────┴─────────┴─────────┘
    ```
 
@@ -203,7 +203,7 @@ When chatting with Hermes, simply ask:
 > *"Which model should I use for: Analyzing authentication handshake for race conditions?"*
 
 Hermes will:
-1. Detect that the query matches the `copilot-router` skill trigger.
+1. Detect that the query matches the `hermes-copilot` skill trigger.
 2. Execute `python3 /workspace/hermes_copilot.py --recommend "<task>"`.
 3. Receive the structured JSON decision from `qwen2.5:0.5b` in < 1 second.
 4. Reply directly in chat with the recommended model, category, rationale, and the `/model <name>` switch command!

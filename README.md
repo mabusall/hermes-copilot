@@ -108,8 +108,8 @@ source ~/.bashrc
 
 ### 4. Install the Hermes Skill (For In-Chat Routing)
 ```bash
-mkdir -p /root/.hermes/skills/copilot-router
-cp -rf /workspace/skills/copilot-router/* /root/.hermes/skills/copilot-router/
+mkdir -p /root/.hermes/skills/hermes-copilot
+cp -rf /workspace/skills/hermes-copilot/* /root/.hermes/skills/hermes-copilot/
 hermes skills list
 ```
 
@@ -152,7 +152,7 @@ h "Write unit tests for email validation utility with xUnit"
 While chatting in the terminal or Web UI (`http://localhost:9119`), ask naturally:
 > *"Which model should I use for: Analyzing authentication handshake for race conditions?"*
 
-Hermes invokes the local `copilot-router` skill, evaluates with `qwen2.5:0.5b`, and responds:
+Hermes invokes the local `hermes-copilot` skill, evaluates with `qwen2.5:0.5b`, and responds:
 > **Recommended Brain:** `deepseek-r1:14b`  
 > **Category:** Security & Logic  
 > **Rationale:** Requires vulnerability analysis and formal logic reasoning.  
@@ -175,7 +175,7 @@ hermes-copilot/
 ├── .gitignore                             # Standard Python & OS ignore rules
 ├── hermes_copilot.py                      # Sub-second Auto-Router script
 ├── skills/
-│   └── copilot-router/
+│   └── hermes-copilot/
 │       └── SKILL.md                       # Hermes native in-chat skill
 └── docs/
     ├── hermes_docker_setup_guide.md       # Full Hermes sandbox deployment guide
