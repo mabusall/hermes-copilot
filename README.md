@@ -113,6 +113,14 @@ cp -rf /workspace/skills/copilot-router/* /root/.hermes/skills/copilot-router/
 hermes skills list
 ```
 
+### 5. Launch the Web UI Dashboard
+Inside `hermes-sandbox-pro`, start the graphical dashboard server:
+```bash
+hermes dashboard --host 0.0.0.0
+```
+Open your browser on Windows and navigate to: **`http://localhost:9119`**  
+*(Configure your username & password on first launch, then chat visually with memory graphs and tool inspection).*
+
 ---
 
 ## 💡 How to Use It
@@ -172,8 +180,7 @@ hermes-copilot/
 └── docs/
     ├── hermes_docker_setup_guide.md       # Full Hermes sandbox deployment guide
     ├── ollama_docker_setup_guide.md       # GPU-accelerated Ollama 4-model fleet setup
-    ├── hermes_copilot_auto_router_guide.md # Detailed router architecture & benchmarks
-    └── azure_pipelines_hermes_integration.md # CI/CD & Azure DevOps PR integration
+    └── hermes_copilot_auto_router_guide.md # Detailed router architecture & benchmarks
 ```
 
 ---
@@ -183,7 +190,6 @@ hermes-copilot/
 * 📖 [Hermes Docker Setup Guide](docs/hermes_docker_setup_guide.md)
 * 📖 [Ollama Docker & 4-Model Fleet Setup Guide](docs/ollama_docker_setup_guide.md)
 * 📖 [Hermes Copilot Auto-Router Technical Guide](docs/hermes_copilot_auto_router_guide.md)
-* 📖 [Azure DevOps & CI/CD Integration Guide](docs/azure_pipelines_hermes_integration.md)
 
 ---
 

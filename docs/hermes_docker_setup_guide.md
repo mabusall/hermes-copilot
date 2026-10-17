@@ -2,7 +2,7 @@
 
 This production guide provides a step-by-step Standard Operating Procedure (SOP) to deploy **Hermes Agent** in an isolated Docker sandbox. The environment is configured with:
 - An interactive **Web UI Dashboard** accessible on your host machine.
-- Seamless **GitHub** and **Azure DevOps** integrations for autonomous code review and PR workflows.
+- Seamless **GitHub** integration for autonomous code review and PR workflows.
 - A built-in **Hermes Copilot Auto-Router** that dynamically switches between local Ollama models (`qwen2.5:0.5b`, `qwen2.5-coder:14b`, `qwen2.5-coder:32b`, `deepseek-r1:14b`) based on task difficulty — functioning just like VS Code GitHub Copilot Auto-mode, 100% offline.
 
 ---
@@ -24,7 +24,7 @@ This production guide provides a step-by-step Standard Operating Procedure (SOP)
 │  - Custom Skills (~/.hermes/skills)  │────▶│  - Local 4-Model Fleet:          │
 │  - Copilot Router (hermes_copilot.py)│     │    • qwen2.5:0.5b (Router)       │
 │  - Workspace Volume (/workspace)     │     │    • qwen2.5-coder:14b (Coding)  │
-│  - Dev Tools: Git, GitHub CLI, Azure │     │    • qwen2.5-coder:32b (Arch)    │
+│  - Dev Tools: Git, GitHub CLI        │     │    • qwen2.5-coder:32b (Arch)    │
 └──────────────────────────────────────┘     │    • deepseek-r1:14b (Security)  │
                                              └──────────────────────────────────┘
 ```
@@ -41,13 +41,10 @@ Create the host storage folder and launch the Ubuntu container with port forward
    ```
 
 2. Run the Docker container:
-   *(Note: Replace `YOUR_AZURE_PAT_HERE` with your Azure DevOps Personal Access Token, or leave as empty quotes if you only use GitHub).*
-
    ```powershell
    docker run -it `
      --name hermes-sandbox-pro `
      -p 9119:9119 `
-     -e AZURE_DEVOPS_EXT_PAT="YOUR_AZURE_PAT_HERE" `
      -v "D:\Data\Docker Data\Hermes:/workspace" `
      ubuntu:latest bash
    ```
@@ -67,24 +64,16 @@ apt update && apt install -y \
 
 ---
 
-## Step 3: Install Platform Tooling (GitHub & Azure DevOps)
+## Step 3: Install GitHub CLI (`gh`)
 
-Install the CLI tools for your preferred version control platforms:
+Install the official GitHub CLI for automated repository operations, PR reviews, and issue triage:
 
-### 1. GitHub CLI (`gh`)
 ```bash
 # Add official GitHub CLI repository and install
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 apt update && apt install -y gh
-```
-
-### 2. Azure DevOps CLI (`az devops`)
-```bash
-# Install Azure CLI and add DevOps extension
-curl -sL https://aka.ms/InstallAzureCLIDeb | bash
-az extension add --name azure-devops
 ```
 
 ---
@@ -229,30 +218,30 @@ Start the graphical dashboard to interact with Hermes visually:
    ```bash
    hermes dashboard --host 0.0.0.0
    ```
+   > [!IMPORTANT]
+   > **Why `--host 0.0.0.0` is required:** By default, Hermes binds locally to `127.0.0.1` inside the container. You must supply `--host 0.0.0.0` to bind to all network interfaces, allowing the port mapping (`-p 9119:9119`) to forward connections from your Windows host browser.
+
 2. On first launch, type `1` to configure username/password authentication (e.g. `admin` and a secure password).
 3. Open your browser on Windows and navigate to:
    **`http://localhost:9119`**
-   *(Do NOT open `0.0.0.0:9119` as Windows browsers cannot route to the all-interfaces address).*
+   *(Do NOT navigate to `0.0.0.0:9119` as Windows browsers cannot route to the all-interfaces wildcard address).*
 
 ---
 
-## Step 9: Platform Authentication & CI/CD Integration
+## Step 9: GitHub Authentication & Agent Skills
 
-### 1. Authenticate GitHub CLI
-```bash
-gh auth login
-```
-*Select: `GitHub.com` -> `HTTPS` -> `Login with a web browser`, and complete the token authorization.*
-Then install the official GitHub agent skill:
-```bash
-hermes skills install github
-```
+Authenticate your GitHub account and equip Hermes with official GitHub skills:
 
-### 2. Authenticate Azure DevOps CLI
-Configure your organization and project defaults:
-```bash
-az devops configure --defaults organization=https://dev.azure.com/YourOrganization project="YourProjectName"
-```
+1. Authenticate with GitHub CLI:
+   ```bash
+   gh auth login
+   ```
+   *Select: `GitHub.com` -> `HTTPS` -> `Login with a web browser`, and complete the token authorization.*
+
+2. Install the official GitHub agent skill:
+   ```bash
+   hermes skills install github
+   ```
 
 ---
 
@@ -298,14 +287,7 @@ To reopen the bash shell:
 docker exec -it hermes-sandbox-pro bash
 ```
 
-### 2. Updating Expired Azure DevOps Tokens
-If your Azure DevOps PAT expires, update it permanently without touching the container:
-```bash
-echo 'export AZURE_DEVOPS_EXT_PAT="YOUR_NEW_PAT_HERE"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### 3. Updating Hermes Agent
+### 2. Updating Hermes Agent
 Check version and update to latest releases:
 ```bash
 hermes --version
