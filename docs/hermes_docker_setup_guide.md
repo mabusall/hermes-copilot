@@ -198,6 +198,14 @@ To allow Hermes to recommend models dynamically inside the **Chat window** or **
    └─────────────────────────┴──────────┴─────────┴─────────┴─────────┘
    ```
 
+3. Enable Automatic Loading in Config (`~/.hermes/config.yaml`):
+To ensure Hermes preloads the skill instructions into every session automatically:
+```yaml
+skills:
+  auto_load:
+    - hermes-copilot
+```
+
 ### 3. How the In-Chat Skill Works
 When chatting with Hermes, simply ask:
 > *"Which model should I use for: Analyzing authentication handshake for race conditions?"*
