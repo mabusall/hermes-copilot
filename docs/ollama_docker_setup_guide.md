@@ -89,7 +89,7 @@ docker exec -it ollama-sandbox-pro ollama pull qwen2.5-coder:32b
 docker exec -it ollama-sandbox-pro ollama pull deepseek-r1:14b
 ```
 
-### Verify the Installed Models:
+### Verify Installed Models on Disk (`ollama list`):
 ```powershell
 docker exec -it ollama-sandbox-pro ollama list
 ```
@@ -102,6 +102,24 @@ qwen2.5-coder:14b    4828733707be    9.0 GB    Just now
 qwen2.5-coder:32b    b92d6a0bd47e    19 GB     Just now
 deepseek-r1:14b      c333b7232bdb    9.0 GB    Just now
 ```
+
+### Check Active / Warm Models in Memory (`ollama ps`):
+To see which models are currently loaded into GPU VRAM and System RAM ready for instant response:
+```powershell
+docker exec -it ollama-sandbox-pro ollama ps
+```
+
+**Example Output:**
+```text
+NAME                 ID              SIZE      PROCESSOR          CONTEXT    UNTIL               
+qwen2.5-coder:14b    4828733707be    15 GB     62%/38% CPU/GPU    32768      25 minutes from now    
+qwen2.5:0.5b         a8b0c5157701    481 MB    100% GPU           4096       11 minutes from now    
+```
+
+> [!NOTE]
+> **`ollama list` vs. `ollama ps`:**
+> * `ollama list`: Shows all models stored on disk (equivalent to `docker images`).
+> * `ollama ps`: Shows models currently loaded into memory (equivalent to `docker ps`), displaying their VRAM/CPU distribution and keep-alive countdown.
 
 ---
 
