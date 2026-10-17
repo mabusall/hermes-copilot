@@ -128,24 +128,34 @@ Make the script executable inside `hermes-sandbox-pro`:
 chmod +x /workspace/hermes_copilot.py
 ```
 
-### 2. Configure Copilot Shell Aliases
-Add shortcuts to `~/.bashrc`:
-```bash
-cat << 'EOF' >> ~/.bashrc
+### 2. Install Executables into System PATH (`/usr/local/bin`)
+To ensure `h` and `hermes-copilot` work both inside the container's interactive shell **and** directly from your Windows host (`docker exec -it hermes-sandbox-pro h ...`), install wrapper scripts into `/usr/local/bin`:
 
-# Hermes Copilot Auto-Router Shortcuts
-alias hermes-copilot="python3 /workspace/hermes_copilot.py"
-alias h="python3 /workspace/hermes_copilot.py"
+```bash
+cat << 'EOF' > /usr/local/bin/h
+#!/bin/bash
+exec python3 /workspace/hermes_copilot.py "$@"
 EOF
 
-source ~/.bashrc
+chmod +x /usr/local/bin/h
+cp /usr/local/bin/h /usr/local/bin/hermes-copilot
 ```
 
+> [!NOTE]
+> Installing real executable binaries into `/usr/local/bin` allows Docker to locate `h` directly via `$PATH` when invoked from the host machine without requiring an interactive login shell.
+
 ### 3. Test the Router via CLI
+
+**From Windows PowerShell:**
+```powershell
+docker exec -it hermes-sandbox-pro h "Audit this token handshake for timing attacks and race conditions"
+```
+
+**Or from inside the container shell:**
 ```bash
 h "Audit this token handshake for timing attacks and race conditions"
 ```
-Hermes Copilot will classify the intent, display a clean routing banner, and launch Hermes with `deepseek-r1:14b`!
+Hermes Copilot will classify the intent in ~50ms, display the clean routing banner, and launch Hermes Agent with `deepseek-r1:14b`!
 
 ---
 
@@ -198,15 +208,16 @@ To allow Hermes to recommend models dynamically inside the **Chat window** or **
    └─────────────────────────┴──────────┴─────────┴─────────┴─────────┘
    ```
 
-3. Enable Automatic Loading in Config (`~/.hermes/config.yaml`):
-To ensure Hermes preloads the skill instructions into every session automatically:
+### 3. Enable Automatic Skill Preloading (`~/.hermes/config.yaml`)
+To ensure Hermes injects the `hermes-copilot` routing instructions into every chat session automatically without manual flags, configure `skills.auto_load`:
+
 ```yaml
 skills:
   auto_load:
     - hermes-copilot
 ```
 
-### 3. How the In-Chat Skill Works
+### 4. How the In-Chat Skill Works
 When chatting with Hermes, simply ask:
 > *"Which model should I use for: Analyzing authentication handshake for race conditions?"*
 
