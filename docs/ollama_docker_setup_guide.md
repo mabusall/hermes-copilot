@@ -176,18 +176,39 @@ Docker containers on the bridge network cannot use `localhost` (which points to 
 
 ## 8. Verification & Health Checks
 
-You can verify that Ollama is healthy and responding to API requests directly from Windows PowerShell:
+You can verify that Ollama is healthy and test model generation directly using `curl` from your host terminal (PowerShell, WSL, or Git Bash):
 
-### 1. Check Available Models via API
-```powershell
-curl http://localhost:11434/api/tags
+### 1. Model Discovery (OpenAI-Compatible `/v1/models` API)
+*Used by Hermes Agent and the Hermes Copilot Auto-Router to dynamically discover installed models:*
+```bash
+curl --location 'http://localhost:11434/v1/models'
 ```
 
-### 2. Test Router Model Generation
-```powershell
-curl -X POST http://localhost:11434/api/generate `
-  -H "Content-Type: application/json" `
-  -d '{"model": "qwen2.5:0.5b", "prompt": "Identify the capital of France in one word.", "stream": false}'
+### 2. Native Ollama Tags Endpoint
+```bash
+curl --location 'http://localhost:11434/api/tags'
+```
+
+### 3. Test Pocket Router Generation (`qwen2.5:0.5b` - Sub-second latency)
+```bash
+curl --location 'http://localhost:11434/api/generate' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "qwen2.5:0.5b",
+    "prompt": "Identify the capital of France in one word.",
+    "stream": false
+  }'
+```
+
+### 4. Test Systems Architect Generation (`qwen2.5-coder:32b` - Deep code generation)
+```bash
+curl --location 'http://localhost:11434/api/generate' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "qwen2.5-coder:32b",
+    "prompt": "i need sample for using FluentValidation in .NET",
+    "stream": false
+  }'
 ```
 
 ---
