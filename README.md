@@ -24,16 +24,18 @@ When using autonomous coding agents locally on consumer hardware (e.g., **8GB VR
 
 ---
 
-## 🧠 The Local Fleet Architecture
+## 🧠 The 3-Tier Local Fleet Architecture
 
-Tailored for an NVIDIA RTX 5060 / 4060 (8GB VRAM) + 32GB DDR5 system:
+Tailored specifically for consumer GPUs (NVIDIA RTX 5060 / 4060 with 8GB VRAM + 32GB DDR5 system):
 
 | Model | Footprint | Speed | Specialized Role |
 | :--- | :--- | :--- | :--- |
-| **`qwen2.5:0.5b`** | 397 MB | **180+ tok/s** | ⚡ **The Pocket Router:** Classifies intent in < 50ms |
-| **`qwen2.5-coder:14b`** | 9.0 GB | **25 tok/s** | 💻 **Daily Coder & Systems Architect:** Code, architecture, unit tests & agent tool calls |
+| **`qwen2.5:0.5b`** | 397 MB | **180+ tok/s** | ⚡ **The Pocket Router:** Classifies task intent in < 50ms |
+| **`qwen2.5-coder:14b`** | 9.0 GB | **25 tok/s** | 💻 **Daily Coder & Systems Architect:** Clean architecture, unit tests, code & tool calls |
 | **`deepseek-r1:14b`** | 9.0 GB | **20 tok/s** | 🔒 **Security & Logic:** Vulnerability audit, race conditions & cryptographic proofs |
-| **`qwen2.5-coder:32b`** | 19.0 GB | **8 tok/s** | 🏛️ **Heavyweight Architect:** Available for dedicated high-RAM environments |
+
+> [!NOTE]
+> `qwen2.5-coder:32b` (19.0 GB) is strictly optional and only recommended for high-VRAM rigs ($\ge 16\text{GB}$ VRAM or $\ge 64\text{GB}$ RAM) to avoid Windows paging freezes. On 8GB VRAM cards, `14b` is the verified optimal performer.
 
 ---
 

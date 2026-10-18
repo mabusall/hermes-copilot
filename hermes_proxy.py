@@ -28,16 +28,20 @@ current_pinned_model: str = "qwen2.5-coder:14b"
 
 
 async def get_available_models(client: httpx.AsyncClient) -> List[str]:
-    """Dynamically queries Ollama for active models."""
+    """Dynamically queries Ollama for active models, filtering out router and oversized models."""
     try:
         r = await client.get(f"{OLLAMA_BASE}/v1/models", timeout=3.0)
         if r.status_code == 200:
             data = r.json()
             models = [m["id"] for m in data.get("data", [])]
-            return [m for m in models if not m.startswith("qwen2.5:0.5b")]
+            # Exclude router model (0.5b) and heavy 32b+ models to protect 8GB VRAM consumer setups
+            return [
+                m for m in models 
+                if not m.startswith("qwen2.5:0.5b") and "32b" not in m and "70b" not in m
+            ]
     except Exception:
         pass
-    return ["qwen2.5-coder:14b", "qwen2.5-coder:32b", "deepseek-r1:14b"]
+    return ["qwen2.5-coder:14b", "deepseek-r1:14b"]
 
 
 async def classify_prompt(prompt: str, available_models: List[str], client: httpx.AsyncClient) -> Dict[str, str]:
@@ -66,8 +70,7 @@ async def classify_prompt(prompt: str, available_models: List[str], client: http
         "prompt": f"""Classify task and select best model from: {json.dumps(available_models)}
 Guidelines:
 - Security, math, cryptographic logic -> deepseek-r1:14b
-- Architecture, system design, enterprise patterns -> qwen2.5-coder:32b
-- Routine coding, functions, unit tests, scripts -> qwen2.5-coder:14b
+- Architecture, system design, coding, unit tests, scripts -> qwen2.5-coder:14b
 
 Task: "{prompt}"
 JSON output (keys: selected_model, category, reason):""",
