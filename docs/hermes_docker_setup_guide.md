@@ -1,9 +1,9 @@
-# Comprehensive Guide to Hermes Agent in Docker & Copilot Auto-Router
+# Comprehensive Guide to Hermes Agent in Docker & Copilot Auto-Proxy
 
 This production guide provides a step-by-step Standard Operating Procedure (SOP) to deploy **Hermes Agent** in an isolated Docker sandbox. The environment is configured with:
 - An interactive **Web UI Dashboard** accessible on your host machine.
 - Seamless **GitHub** integration for autonomous code review and PR workflows.
-- A built-in **Hermes Copilot Auto-Router** that dynamically switches between local Ollama models (`qwen2.5:0.5b`, `qwen2.5-coder:14b`, `qwen2.5-coder:32b`, `deepseek-r1:14b`) based on task difficulty — functioning just like VS Code GitHub Copilot Auto-mode, 100% offline.
+- A built-in **Hermes Copilot Auto-Proxy** that dynamically routes between local Ollama models (`qwen2.5:0.5b`, `qwen2.5-coder:14b`, `deepseek-r1:14b`) based on task intent and difficulty — functioning just like VS Code GitHub Copilot Auto-mode, 100% offline and native to the Hermes Chat UI and TUI.
 
 ---
 
@@ -21,12 +21,11 @@ This production guide provides a step-by-step Standard Operating Procedure (SOP)
 ┌──────────────────────────────────────┐     ┌──────────────────────────────────┐
 │  CONTAINER: hermes-sandbox-pro       │     │  CONTAINER: ollama-sandbox-pro   │
 │  - Hermes Agent Runtime & Web UI     │     │  - Port 11434 (GPU Accelerated)  │
-│  - Custom Skills (~/.hermes/skills)  │────▶│  - Local 4-Model Fleet:          │
-│  - Copilot Router (hermes_copilot.py)│     │    • qwen2.5:0.5b (Router)       │
+│    (Model set to "auto")             │     │  - Local Models:                 │
+│  - Auto-Proxy (hermes_proxy.py:8000) │────▶│    • qwen2.5:0.5b (Router)       │
 │  - Workspace Volume (/workspace)     │     │    • qwen2.5-coder:14b (Coding)  │
-│  - Dev Tools: Git, GitHub CLI        │     │    • qwen2.5-coder:32b (Arch)    │
-└──────────────────────────────────────┘     │    • deepseek-r1:14b (Security)  │
-                                             └──────────────────────────────────┘
+│  - Dev Tools: Git, GitHub CLI        │     │    • deepseek-r1:14b (Security)  │
+└──────────────────────────────────────┘     └──────────────────────────────────┘
 ```
 
 ---
@@ -98,134 +97,71 @@ docker exec hermes-sandbox-pro /usr/local/lib/hermes-agent/venv/bin/python3 -m p
 
 ---
 
-## Step 5: Configure Hermes for Local Ollama
+## Step 5: Pull Required Models in Ollama
 
-Point Hermes to your local GPU-accelerated Ollama container instead of external cloud APIs:
+Ensure the GPU-accelerated Ollama container has the required local models pulled. Run from Windows PowerShell:
 
-1. Inside `hermes-sandbox-pro`, start the model setup wizard:
-   ```bash
-   hermes model
-   ```
-2. Select **Custom OpenAI-Compatible API** (or **Local Ollama**).
-3. **Base URL:** Enter `http://172.17.0.1:11434/v1` (or `http://host.docker.internal:11434/v1`).
-   > [!TIP]
-   > `172.17.0.1` is the Docker bridge default gateway on Linux/Windows and avoids IPv6 DNS resolution issues.
-4. **API Key:** Enter `ollama` (or any non-empty string).
-5. **Default Model:** Enter `qwen2.5-coder:14b`.
-
----
-
-## Step 6: Install Hermes Copilot Auto-Router
-
-The **Copilot Auto-Router** (`hermes_copilot.py`) operates as a local dispatcher. It queries Ollama's active model catalog and uses a lightweight `qwen2.5:0.5b` model (~350 MB VRAM) to classify user tasks in **< 1 second** and automatically route to the optimal model:
-- **`deepseek-r1:14b`** $\rightarrow$ Security vulnerabilities, authentication audits, race conditions, math proofs.
-- **`qwen2.5-coder:32b`** $\rightarrow$ System architecture, enterprise design patterns, clean architecture domain modeling.
-- **`qwen2.5-coder:14b`** $\rightarrow$ Daily software engineering, writing functions, unit tests, bug fixes, scripts.
-
-### 1. Ensure `hermes_copilot.py` is in `/workspace/`
-Make the script executable inside `hermes-sandbox-pro`:
-```bash
-chmod +x /workspace/hermes_copilot.py
-```
-
-### 2. Install Executables into System PATH (`/usr/local/bin`)
-To ensure `h` and `hermes-copilot` work both inside the container's interactive shell **and** directly from your Windows host (`docker exec -it hermes-sandbox-pro h ...`), install wrapper scripts into `/usr/local/bin`:
-
-```bash
-cat << 'EOF' > /usr/local/bin/h
-#!/bin/bash
-exec python3 /workspace/hermes_copilot.py "$@"
-EOF
-
-chmod +x /usr/local/bin/h
-cp /usr/local/bin/h /usr/local/bin/hermes-copilot
-```
-
-> [!NOTE]
-> Installing real executable binaries into `/usr/local/bin` allows Docker to locate `h` directly via `$PATH` when invoked from the host machine without requiring an interactive login shell.
-
-### 3. Test the Router via CLI
-
-**From Windows PowerShell:**
 ```powershell
-docker exec -it hermes-sandbox-pro h "Audit this token handshake for timing attacks and race conditions"
+# 1. Pocket classifier router (< 50ms classification, ~350MB VRAM)
+docker exec -it ollama-sandbox-pro ollama pull qwen2.5:0.5b
+
+# 2. Daily software engineering, coding & unit tests (~9GB)
+docker exec -it ollama-sandbox-pro ollama pull qwen2.5-coder:14b
+
+# 3. Deep reasoning, security audits, cryptography & logic proofs (~9GB)
+docker exec -it ollama-sandbox-pro ollama pull deepseek-r1:14b
 ```
 
-**Or from inside the container shell:**
+---
+
+## Step 6: Deploy Hermes Copilot Auto-Proxy (`hermes_proxy.py`)
+
+The **Hermes Copilot Auto-Proxy** acts as an intelligent OpenAI-compatible reverse proxy running locally inside `hermes-sandbox-pro` on port `8000`.
+
+### 1. Ensure `hermes_proxy.py` is in `/workspace/`
+The repository file `hermes_proxy.py` maps automatically to `/workspace/hermes_proxy.py` inside the container via your Docker volume (`D:\Data\Docker Data\Hermes`).
+
+### 2. Launch the Auto-Proxy in the Background
+Start the proxy as a persistent background daemon:
 ```bash
-h "Audit this token handshake for timing attacks and race conditions"
-```
-Hermes Copilot will classify the intent in ~50ms, display the clean routing banner, and launch Hermes Agent with `deepseek-r1:14b`!
-
----
-
-## Step 7: How to Add & Manage Custom Skills in Hermes
-
-Hermes Agent has an extensible plugin/skill engine. Skills teach the agent how to run specialized workflows, query tools, or route tasks.
-
-### 1. Anatomy of a Hermes Skill
-A Hermes skill is a directory placed inside `/root/.hermes/skills/<skill-name>/` containing a `SKILL.md` file with standard YAML frontmatter:
-
-```markdown
----
-name: skill-name
-description: Clear, 1-2 sentence description of when the agent should trigger this skill.
-version: 1.0.0
-author: Engineering Team
-license: MIT
----
-
-# Skill Title
-
-## When to Trigger
-- Scenarios where the agent should use this skill.
-
-## Execution Steps
-1. Commands or scripts the agent must run.
-2. How to present the output to the user.
+nohup /usr/local/lib/hermes-agent/venv/bin/python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1 &
 ```
 
-### 2. Installing the `hermes-copilot` Skill
-To allow Hermes to recommend models dynamically inside the **Chat window** or **Web UI**:
+> [!TIP]
+> The proxy logs every routing decision, model assignment, and latency benchmark to `/workspace/proxy.log` (accessible on host at `D:\Data\Docker Data\Hermes\proxy.log`).
 
-1. Create the skill directory and copy the skill file:
+### 3. Verify Proxy Health
+Test the proxy's model catalog:
+```bash
+curl http://127.0.0.1:8000/v1/models
+```
+The output will list `"id": "auto"` at the top, along with all local Ollama models.
+
+---
+
+## Step 7: Configure Hermes Agent for Auto-Mode
+
+Configure Hermes to communicate with the Auto-Proxy so all chats default to `auto`:
+
+1. Set the OpenAI-compatible Base URL and default model:
    ```bash
-   mkdir -p /root/.hermes/skills/hermes-copilot
-   cp -rf /workspace/skills/hermes-copilot/* /root/.hermes/skills/hermes-copilot/
+   hermes config set model.base_url http://127.0.0.1:8000/v1
+   hermes config set model.default auto
    ```
 
-2. Verify that Hermes discovers the skill:
+2. Verify the configuration:
    ```bash
-   hermes skills list
+   hermes config get model
    ```
    **Output:**
-   ```text
-   Installed Skills
-   ┏━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
-   ┃ Name                    ┃ Category ┃ Source  ┃ Trust   ┃ Status  ┃
-   ┡━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
-   │ hermes-copilot          │          │ local   │ local   │ enabled │
-   └─────────────────────────┴──────────┴─────────┴─────────┴─────────┘
+   ```yaml
+   default: auto
+   provider: custom
+   base_url: http://127.0.0.1:8000/v1
+   api_key: '***'
    ```
 
-### 3. Enable Automatic Skill Preloading (`~/.hermes/config.yaml`)
-To ensure Hermes injects the `hermes-copilot` routing instructions into every chat session automatically without manual flags, configure `skills.auto_load`:
-
-```yaml
-skills:
-  auto_load:
-    - hermes-copilot
-```
-
-### 4. How the In-Chat Skill Works
-When chatting with Hermes, simply ask:
-> *"Which model should I use for: Analyzing authentication handshake for race conditions?"*
-
-Hermes will:
-1. Detect that the query matches the `hermes-copilot` skill trigger.
-2. Execute `python3 /workspace/hermes_copilot.py --recommend "<task>"`.
-3. Receive the structured JSON decision from `qwen2.5:0.5b` in < 1 second.
-4. Reply directly in chat with the recommended model, category, rationale, and the `/model <name>` switch command!
+Now, any session started via CLI, TUI, or Web UI will natively submit prompts with `model: "auto"`. The proxy classifies intent in 50ms and routes to the ideal model without manual switching!
 
 ---
 
@@ -266,31 +202,29 @@ Authenticate your GitHub account and equip Hermes with official GitHub skills:
 
 ## Step 10: Day-to-Day Workflow & Usage Guide
 
-### Mode 1: Terminal Auto-Dispatcher (`h "prompt"`)
-Launch a fresh session with the optimal model automatically selected:
-```bash
-# Security task -> routes to deepseek-r1:14b
-h "Audit this JWT validation logic for replay vulnerabilities"
-
-# System design -> routes to qwen2.5-coder:32b
-h "Design clean architecture domain boundaries for order fulfillment"
-
-# Implementation -> routes to qwen2.5-coder:14b
-h "Write unit tests for the password hashing utility with xUnit"
+### Mode 1: Native In-Chat "Auto" Experience (Web UI & TUI)
+Simply chat naturally in the Hermes Web UI (`http://localhost:9119`) or CLI chat (`hermes chat`). You do not need to specify model names or run helper scripts:
+```text
+Write a C# FluentValidation validator for a UserRegistrationDTO and create unit tests
 ```
+The Auto-Proxy detects software engineering intent, streams the prompt to `qwen2.5-coder:14b`, and executes unit tests.
 
-### Mode 2: In-Chat Skill Recommendation (Chat & Web UI)
-While chatting in the terminal or Web UI, ask naturally:
-> *"Which model should I switch to for designing the microservices event schema?"*
+### Mode 2: Deep Security & Reasoning Auto-Routing
+Submit a complex cryptographic or security analysis prompt:
+```text
+Analyze this authentication handshake for timing attack vulnerabilities and race conditions
+```
+The Auto-Proxy detects security and reasoning keywords in < 50ms, dynamically routes to `deepseek-r1:14b`, and streams deep chain-of-thought analysis.
 
-Hermes will reply with the recommendation (`qwen2.5-coder:32b`) and guide you to switch.
+### Mode 3: Multi-Turn Tool Pinning
+When Hermes invokes agent tools (e.g., executing code, editing files, or running git commands), the Auto-Proxy pins the active model for all subsequent tool calls in that turn. This guarantees zero weight thrashing or VRAM swapping during multi-step tool execution.
 
-### Mode 3: In-Session Hot-Swap (`/model`)
-To switch models mid-conversation without losing context or restarting:
+### Mode 4: Manual Hot-Swap (`/model`)
+If you ever want to force a specific model instead of `auto`:
 ```text
 /model
 ```
-Select the target model from the list. Ollama swaps the weights in memory smoothly.
+Select any specific model from the list. Ollama swaps the weights smoothly.
 
 ---
 
@@ -301,6 +235,11 @@ When restarting your Windows machine, do **not** recreate the container. Simply 
 ```powershell
 docker start hermes-sandbox-pro
 ```
+Ensure the Auto-Proxy background daemon is running inside `hermes-sandbox-pro`:
+```powershell
+docker exec -d hermes-sandbox-pro nohup /usr/local/lib/hermes-agent/venv/bin/python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1
+```
+
 To reopen the bash shell:
 ```powershell
 docker exec -it hermes-sandbox-pro bash

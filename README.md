@@ -1,4 +1,4 @@
-# 🤖 Hermes Copilot: Auto Local Models Switcher
+# 🤖 Hermes Copilot: Auto Local Models Router & Proxy
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Hermes Agent](https://img.shields.io/badge/Agent-Hermes--Sandbox-orange.svg)](https://github.com/NousResearch/hermes-agent)
@@ -14,54 +14,55 @@
 
 When using autonomous coding agents locally on consumer hardware (e.g., **8GB VRAM GPU + 32GB RAM**), developers face two major obstacles:
 1. **Model Selection Fatigue:** Manually guessing whether a task needs a fast coder, a heavy architect, or a deep reasoning model.
-2. **VRAM Thrashing:** Traditional proxy routers (like LiteLLM) switch models per-request, forcing Ollama to unload and reload 10–20 GB model weights on every agent step (taking 15+ seconds each time).
+2. **VRAM Thrashing:** Traditional proxy routers switch models per-request, forcing Ollama to unload and reload 10–20 GB model weights on every agent step (taking 15+ seconds each time).
 
-**Hermes Copilot** introduces a sub-second **Pocket-LLM Intent Classifier**:
+**Hermes Copilot** introduces a native OpenAI-compatible **Auto-Proxy (`hermes_proxy.py`)**:
 * **50ms Evaluation:** Uses `qwen2.5:0.5b` (~350 MB VRAM) to classify user prompt difficulty.
-* **Dynamic Catalog Discovery:** Queries Ollama’s active `/v1/models` API live — no hardcoded config files. When you `ollama pull` a new model, the router instantly knows about it.
-* **Hardware-Aware Routing:** Keeps models persistent per session or dispatches recommendations via native in-chat skills.
+* **Native In-Chat Auto Mode:** You simply select `model: auto` in the Hermes Web UI or TUI, exactly like VS Code Copilot.
+* **Tool-Turn Pinning:** When Hermes enters an iterative tool-execution cycle (bash commands, writing files), the proxy locks the model in place to prevent VRAM swapping freezes.
+* **Cloud-Ready:** Standard OpenAI API interface allows routing to cloud models (OpenRouter, Claude 3.5 Sonnet, GPT-4o) with zero Hermes reconfiguration.
 
 ---
 
-## 🧠 The 4-Model Local Fleet
+## 🧠 The Local Fleet Architecture
 
 Tailored for an NVIDIA RTX 5060 / 4060 (8GB VRAM) + 32GB DDR5 system:
 
 | Model | Footprint | Speed | Specialized Role |
 | :--- | :--- | :--- | :--- |
 | **`qwen2.5:0.5b`** | 397 MB | **180+ tok/s** | ⚡ **The Pocket Router:** Classifies intent in < 50ms |
-| **`qwen2.5-coder:14b`** | 9.0 GB | **25 tok/s** | 💻 **Daily Coder:** Functions, unit tests, bug fixes & agent tool calls |
-| **`qwen2.5-coder:32b`** | 19.0 GB | **8 tok/s** | 🏛️ **Systems Architect:** Domain design, large refactors & class hierarchies |
-| **`deepseek-r1:14b`** | 9.0 GB | **20 tok/s** | 🔒 **Security & Logic:** Vulnerability audit, race conditions & math proofs |
+| **`qwen2.5-coder:14b`** | 9.0 GB | **25 tok/s** | 💻 **Daily Coder & Systems Architect:** Code, architecture, unit tests & agent tool calls |
+| **`deepseek-r1:14b`** | 9.0 GB | **20 tok/s** | 🔒 **Security & Logic:** Vulnerability audit, race conditions & cryptographic proofs |
+| **`qwen2.5-coder:32b`** | 19.0 GB | **8 tok/s** | 🏛️ **Heavyweight Architect:** Available for dedicated high-RAM environments |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-                       [ User Prompt / Task Query ]
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│         POCKET ROUTER (qwen2.5:0.5b • 397 MB • <1s evaluation)         │
-│  1. Live Query: GET http://172.17.0.1:11434/v1/models                   │
-│  2. Discovers Pulled Models: [14b-coder, 32b-coder, deepseek-r1:14b]   │
-│  3. Intent & Domain Classification:                                    │
-│     {                                                                  │
-│       "selected_model": "deepseek-r1:14b",                             │
-│       "category": "Security & Logic",                                  │
-│       "reason": "Requires cryptographic proof and race-condition audit"│
-│     }                                                                  │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-            ┌───────────────────────┼───────────────────────┐
-            ▼                       ▼                       ▼
-    [Security / Logic]        [Architecture]        [Routine Coding]
-     deepseek-r1:14b         qwen2.5-coder:32b      qwen2.5-coder:14b
-            │                       │                       │
-            └───────────────────────┼───────────────────────┘
-                                    ▼
-               [ Hermes Agent Booted with Optimal Brain ]
+ ┌─────────────────────────────────────────────────────────────────┐
+ │               HERMES AGENT (Web UI / TUI / Chat)                │
+ │                     Active Model: "auto"                        │
+ └──────────────────────────────┬──────────────────────────────────┘
+                                │ POST /v1/chat/completions (model: "auto")
+                                ▼
+ ┌─────────────────────────────────────────────────────────────────┐
+ │       HERMES AUTO-PROXY (FastAPI • Local Port 8000)             │
+ │                                                                 │
+ │ 1. Intercepts incoming turn with model: "auto"                  │
+ │ 2. Sub-Second Pocket Classifier (qwen2.5:0.5b in 50ms):         │
+ │    • Security / Cryptography / Logic ──▶ deepseek-r1:14b        │
+ │    • Architecture / Systems Design   ──▶ qwen2.5-coder:14b      │
+ │    • Routine Coding / Unit Tests     ──▶ qwen2.5-coder:14b      │
+ │ 3. Tool-Execution Pinning: Keeps model warm during active tool  │
+ │    cycles (bash, write_file) to prevent VRAM swapping freezes.  │
+ └──────────────────────────────┬──────────────────────────────────┘
+                                │ Forwards with real model name
+                                ▼
+ ┌─────────────────────────────────────────────────────────────────┐
+ │               OLLAMA (GPU Port 11434)                           │
+ │        Executes the chosen model and streams back               │
+ └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -75,11 +76,10 @@ docker run -d --gpus=all -e OLLAMA_KEEP_ALIVE="-1" --name ollama-sandbox-pro `
   -p 11434:11434 -v "D:\Data\Docker Data\Ollama:/root/.ollama" ollama/ollama:latest
 ```
 
-Pull the 4-model fleet:
+Pull the model fleet:
 ```powershell
 docker exec -it ollama-sandbox-pro ollama pull qwen2.5:0.5b
 docker exec -it ollama-sandbox-pro ollama pull qwen2.5-coder:14b
-docker exec -it ollama-sandbox-pro ollama pull qwen2.5-coder:32b
 docker exec -it ollama-sandbox-pro ollama pull deepseek-r1:14b
 ```
 
@@ -96,72 +96,41 @@ curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scri
 source ~/.bashrc
 ```
 
-### 3. Install Copilot Router & Aliases
-Copy `hermes_copilot.py` to `/workspace/` and configure bash aliases:
+### 3. Start the Auto-Proxy Service
+Ensure `hermes_proxy.py` is in `/workspace/` and launch the daemon inside the container:
 ```bash
-cat << 'EOF' >> ~/.bashrc
-alias hermes-copilot="python3 /workspace/hermes_copilot.py"
-alias h="python3 /workspace/hermes_copilot.py"
-EOF
-source ~/.bashrc
+nohup /usr/local/lib/hermes-agent/venv/bin/python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1 &
 ```
 
-### 4. Install the Hermes Skill (For In-Chat Routing)
+### 4. Configure Hermes Agent for Auto-Mode
+Point Hermes to the Auto-Proxy:
 ```bash
-mkdir -p /root/.hermes/skills/hermes-copilot
-cp -rf /workspace/skills/hermes-copilot/* /root/.hermes/skills/hermes-copilot/
-hermes skills list
+hermes config set model.base_url http://127.0.0.1:8000/v1
+hermes config set model.default auto
 ```
 
 ### 5. Launch the Web UI Dashboard
-Inside `hermes-sandbox-pro`, start the graphical dashboard server:
+Inside `hermes-sandbox-pro`, start the dashboard server:
 ```bash
 hermes dashboard --host 0.0.0.0
 ```
 Open your browser on Windows and navigate to: **`http://localhost:9119`**  
-*(Configure your username & password on first launch, then chat visually with memory graphs and tool inspection).*
 
 ---
 
 ## 💡 How to Use It
 
-### Mode 1: Terminal Auto-Dispatcher (`h "prompt"`)
-Launch an autonomous session with the best model selected in ~1 second:
-```bash
-# Security & Logic -> Automatically dispatches deepseek-r1:14b
-h "Audit this token handshake for timing attacks and race conditions"
+Open your Hermes Chat UI (terminal or Web UI). The model indicator displays **`auto`**. Type your prompt naturally:
 
-# Architecture -> Automatically dispatches qwen2.5-coder:32b
-h "Design clean architecture domain entities and repository interfaces"
-
-# Daily Coding -> Automatically dispatches qwen2.5-coder:14b
-h "Write unit tests for email validation utility with xUnit"
-```
-
-**Banner Output Example:**
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│ 🤖 Hermes Copilot (Auto-Mode)
-│ 🎯 Task Category  : Security & Logic
-│ 🧠 Dispatched Brain: deepseek-r1:14b
-│ 💡 Rationale       : Requires security vulnerability and logic analysis.
-└─────────────────────────────────────────────────────────────────┘
-```
+# Security & Logic -> Automatically routes to deepseek-r1:14b
+Analyze this authentication handshake for timing attack vulnerabilities and race conditions
 
-### Mode 2: In-Chat Skill Recommendation (Terminal & Web UI)
-While chatting in the terminal or Web UI (`http://localhost:9119`), ask naturally:
-> *"Which model should I use for: Analyzing authentication handshake for race conditions?"*
+# Architecture -> Automatically routes to qwen2.5-coder:14b and calls architecture-diagram
+Design the enterprise clean architecture for an order fulfillment service with CQRS and MediatR
 
-Hermes invokes the local `hermes-copilot` skill, evaluates with `qwen2.5:0.5b`, and responds:
-> **Recommended Brain:** `deepseek-r1:14b`  
-> **Category:** Security & Logic  
-> **Rationale:** Requires vulnerability analysis and formal logic reasoning.  
-> *To switch to this model, type:* `/model deepseek-r1:14b`
-
-### Mode 3: In-Session Hot-Swap (`/model`)
-Switch models on the fly during an ongoing conversation without losing context:
-```text
-/model
+# Daily Implementation -> Automatically routes to qwen2.5-coder:14b
+Write a C# FluentValidation validator for a UserRegistrationDTO and create unit tests
 ```
 
 ---
@@ -172,15 +141,12 @@ Switch models on the fly during an ongoing conversation without losing context:
 hermes-copilot/
 ├── README.md                              # This file
 ├── LICENSE                                # MIT License
-├── .gitignore                             # Standard Python & OS ignore rules
-├── hermes_copilot.py                      # Sub-second Auto-Router script
-├── skills/
-│   └── hermes-copilot/
-│       └── SKILL.md                       # Hermes native in-chat skill
+├── .gitignore                             # Git ignore rules
+├── hermes_proxy.py                        # OpenAI-compatible Auto-Proxy router
 └── docs/
-    ├── hermes_docker_setup_guide.md       # Full Hermes sandbox deployment guide
-    ├── ollama_docker_setup_guide.md       # GPU-accelerated Ollama 4-model fleet setup
-    └── hermes_copilot_auto_router_guide.md # Detailed router architecture & benchmarks
+    ├── hermes_docker_setup_guide.md       # Complete Hermes Docker setup & Auto-Proxy guide
+    ├── ollama_docker_setup_guide.md       # GPU-accelerated Ollama setup & health checks
+    └── hermes_copilot_auto_proxy_guide.md # Detailed Auto-Proxy architecture & benchmarks
 ```
 
 ---
@@ -188,8 +154,8 @@ hermes-copilot/
 ## 📚 In-Depth Documentation
 
 * 📖 [Hermes Docker Setup Guide](docs/hermes_docker_setup_guide.md)
-* 📖 [Ollama Docker & 4-Model Fleet Setup Guide](docs/ollama_docker_setup_guide.md)
-* 📖 [Hermes Copilot Auto-Router Technical Guide](docs/hermes_copilot_auto_router_guide.md)
+* 📖 [Ollama Docker Setup Guide](docs/ollama_docker_setup_guide.md)
+* 📖 [Hermes Copilot Auto-Proxy Technical Guide](docs/hermes_copilot_auto_proxy_guide.md)
 
 ---
 
