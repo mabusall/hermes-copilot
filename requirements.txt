@@ -1,0 +1,2 @@
+# Default Hermes Copilot dependencies (Recommended: Semantic Router Edition)
+-r requirements/semantic.txt

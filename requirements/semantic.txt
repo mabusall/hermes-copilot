@@ -1,0 +1,6 @@
+# Semantic Router Edition (FastEmbed ONNX, CPU, ~340MB RAM)
+semantic-router>=1.1.1
+fastembed>=0.9.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+httpx>=0.27.0

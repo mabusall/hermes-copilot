@@ -1,6 +1,6 @@
 # Ollama Docker Setup Guide & 2-Tier Local Fleet Infrastructure
 
-This Standard Operating Procedure (SOP) provides a complete, reproducible guide to deploying **Ollama** in Docker with full NVIDIA GPU acceleration. It establishes the 2-tier local execution fleet designed to power the **Hermes Copilot** ecosystem — while prompt routing runs entirely in Python on CPU via the System 1 Auto-Router (Semantic Router), dedicating 100% of GPU VRAM to the active task model.
+This Standard Operating Procedure (SOP) provides a complete, reproducible guide to deploying **Ollama** in Docker with full NVIDIA GPU acceleration. It establishes the 2-tier local execution fleet designed to power the **Hermes Copilot** ecosystem — while prompt routing runs entirely in Python on CPU via your choice of three System 1 Auto-Routers (**Semantic Router**, **Laya / Jev**, or **RouteLLM**), dedicating 100% of GPU VRAM to the active task model.
 
 ---
 
@@ -22,7 +22,7 @@ Rather than relying on a single generalist model or paying cloud API fees, this 
 
 > [!TIP]
 > **Where is the Router Brain?**  
-> The routing decision runs **in-process inside the Python proxy on CPU** (using FastEmbed ONNX / Semantic Router). Because the router uses 0 MB of Ollama VRAM and finishes in < 60ms, Ollama never needs to load a "brain" model, eliminating VRAM thrashing and model-swapping lag completely.
+> The routing decision runs **in-process inside the Python proxy on CPU** (`copilot/hermes_proxy_semantic.py`, `copilot/hermes_proxy_laya.py`, or `copilot/hermes_proxy_routellm.py`). Because the router uses **0 MB of Ollama VRAM** and classifies in milliseconds on CPU, Ollama never needs to load a "brain" model, eliminating VRAM thrashing and model-swapping lag completely.
 
 ### Fleet Roles & Capabilities
 1. **`qwen2.5-coder:14b` (Primary Daily Driver & Systems Architect):**
@@ -109,8 +109,7 @@ docker exec -it ollama-sandbox-pro ollama ps
 **Example Output:**
 ```text
 NAME                 ID              SIZE      PROCESSOR          CONTEXT    UNTIL               
-qwen2.5-coder:14b    4828733707be    15 GB     62%/38% CPU/GPU    32768      25 minutes from now    
-qwen2.5:1.5b         62f74b471576    1.1 GB    100% GPU           4096       11 minutes from now    
+qwen2.5-coder:14b    4828733707be    15 GB     38%/62% CPU/GPU    32768      Forever    
 ```
 
 > [!NOTE]
@@ -124,18 +123,18 @@ qwen2.5:1.5b         62f74b471576    1.1 GB    100% GPU           4096       11 
 
 Evaluated on an ASUS TUF Gaming F16 (Intel Core i7-14650HX, NVIDIA RTX 5060 8GB Mobile, 32GB DDR5-5600 RAM):
 
-| Model | Weights Size | GPU VRAM Allocated | System RAM Allocated | Inference Speed | First Token Latency |
+| Component / Model | Weights / RAM | GPU VRAM Allocated | System RAM Allocated | Speed / Latency | First Token Latency |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`qwen2.5:1.5b`** | 986 MB | 100% (~1.0 GB) | 0 GB | **150+ tok/s** | < 60 ms |
+| **System 1 Router** *(Semantic / Laya / RouteLLM)* | 340 MB – 2.0 GB | **0 GB (0% GPU)** | 0.34 – 2.0 GB (CPU) | **5.6 – 241 ms** | N/A (In-process) |
 | **`qwen2.5-coder:14b`** | 9.0 GB | ~75% (~6.2 GB) | ~3.8 GB | **22–28 tok/s** | 1–2 sec |
 | **`deepseek-r1:14b`** | 9.0 GB | ~75% (~6.2 GB) | ~3.8 GB | **18–24 tok/s** | 2–3 sec |
-| **`qwen2.5-coder:32b`** | 19.0 GB | ~35% (~6.5 GB) | ~14.5 GB | **7–9 tok/s** | 8–12 sec |
+| **`qwen2.5-coder:32b`** *(Optional)* | 19.0 GB | ~35% (~6.5 GB) | ~14.5 GB | **7–9 tok/s** | 8–12 sec |
 
 > [!TIP]
-> **Dual-Slot VRAM Management & LRU Eviction:**
-> With `OLLAMA_MAX_LOADED_MODELS=2`, Ollama reserves Slot 1 for the lightweight `1.5B` brain (~1.2 GB VRAM) and Slot 2 for the active 14B task model.
-> - **Continuous Coding:** `qwen2.5-coder:14b` stays in Slot 2 indefinitely. When you send follow-up coding prompts, both the brain and the coder are warm, yielding **0ms reload delay**.
-> - **Domain Shift (e.g. to DeepSeek R1):** When the brain selects `deepseek-r1:14b`, Ollama uses **Least Recently Used (LRU)** eviction. Because the brain was queried milliseconds ago, Ollama keeps the brain untouched in Slot 1 and swaps only Slot 2 (`14b Coder` $\rightarrow$ `DeepSeek R1`), preventing VRAM thrashing.
+> **Single-Slot Worker VRAM Management (`OLLAMA_MAX_LOADED_MODELS=1`):**
+> Because the System 1 Router runs inside the Hermes container on CPU (`0 MB` GPU VRAM), Ollama only ever loads **one** 14B worker model at a time:
+> - **Continuous Coding & General Chat:** `qwen2.5-coder:14b` stays pinned in VRAM indefinitely (`OLLAMA_KEEP_ALIVE="-1"`), yielding **0ms reload delay**.
+> - **Security / Deep Reasoning Shift:** When the CPU router selects `deepseek-r1:14b`, Ollama cleanly swaps the single GPU slot to `deepseek-r1:14b` with 100% of your 8GB VRAM available.
 
 ---
 
@@ -189,24 +188,24 @@ curl --location 'http://localhost:11434/v1/models'
 curl --location 'http://localhost:11434/api/tags'
 ```
 
-### 3. Test Orchestrator Brain Generation (`qwen2.5:1.5b` - Sub-second latency)
-```bash
-curl --location 'http://localhost:11434/api/generate' \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "model": "qwen2.5:1.5b",
-    "prompt": "Identify the capital of France in one word.",
-    "stream": false
-  }'
-```
-
-### 4. Test Coder & Architect Generation (`qwen2.5-coder:14b`)
+### 3. Test Coder & Architect Generation (`qwen2.5-coder:14b`)
 ```bash
 curl --location 'http://localhost:11434/api/generate' \
   --header 'Content-Type: application/json' \
   --data '{
     "model": "qwen2.5-coder:14b",
     "prompt": "i need sample for using FluentValidation in .NET",
+    "stream": false
+  }'
+```
+
+### 4. Test Security & Reasoning Generation (`deepseek-r1:14b`)
+```bash
+curl --location 'http://localhost:11434/api/generate' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "deepseek-r1:14b",
+    "prompt": "Prove in two sentences why XOR with a repeating key is not semantically secure.",
     "stream": false
   }'
 ```
@@ -220,7 +219,7 @@ To open an interactive shell inside the Ollama container (e.g. to run `ollama` c
 ```powershell
 docker exec -it ollama-sandbox-pro bash
 ```
-*(Once inside, you can run commands like `ollama list`, `ollama run qwen2.5:1.5b`, or inspect files directly without typing `docker exec` each time).*
+*(Once inside, you can run commands like `ollama list`, `ollama ps`, or inspect files directly without typing `docker exec` each time).*
 
 ### Resuming After Machine Reboot
 When you reboot Windows, do **not** run `docker run` again. Simply restart the existing container:
@@ -240,6 +239,6 @@ docker rm ollama-sandbox-pro
 docker pull ollama/ollama:latest
 
 # 3. Re-create container using identical command from Step 2
-docker run -d --gpus=all -e OLLAMA_KEEP_ALIVE="-1" -e OLLAMA_MAX_LOADED_MODELS="2" --name ollama-sandbox-pro -p 11434:11434 -v "D:\Data\Docker Data\Ollama:/root/.ollama" ollama/ollama:latest
+docker run -d --gpus=all -e OLLAMA_KEEP_ALIVE="-1" -e OLLAMA_MAX_LOADED_MODELS="1" --name ollama-sandbox-pro -p 11434:11434 -v "D:\Data\Docker Data\Ollama:/root/.ollama" ollama/ollama:latest
 ```
 All your models will be immediately recognized without re-downloading!

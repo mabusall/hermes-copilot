@@ -1,0 +1,353 @@
+{
+  "backend": "routellm",
+  "timestamp": "2026-10-23T18:48:06",
+  "n": 40,
+  "accuracy": 0.675,
+  "latency_ms": {
+    "p50": 14.81,
+    "p95": 22.31,
+    "mean": 15.71
+  },
+  "cold_load_s": 7.85,
+  "ram_mb": {
+    "before": 16.1,
+    "after_load": 1226.2,
+    "delta": 1210.1,
+    "end": 1249.4
+  },
+  "label_map": {
+    "general": "coding"
+  },
+  "confusion": {
+    "coding": {
+      "coding": 22,
+      "reasoning": 3
+    },
+    "reasoning": {
+      "coding": 10,
+      "reasoning": 5
+    }
+  },
+  "details": [
+    {
+      "prompt": "Write a Python function to validate an IPv4 address with regex and unit tests",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5186454057693481,
+      "ms": 13.11,
+      "ok": true
+    },
+    {
+      "prompt": "Refactor this C# service class to use dependency injection and add xUnit tests",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5444657802581787,
+      "ms": 14.49,
+      "ok": true
+    },
+    {
+      "prompt": "Create a FluentValidation validator for a UserRegistrationDTO in .NET",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5509189367294312,
+      "ms": 14.39,
+      "ok": true
+    },
+    {
+      "prompt": "Fix the NullReferenceException in my ASP.NET Core controller when the request body is empty",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.559689462184906,
+      "ms": 17.56,
+      "ok": true
+    },
+    {
+      "prompt": "Write a SQL query that returns the top 5 customers by total order value in the last 30 days",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5754001140594482,
+      "ms": 13.45,
+      "ok": true
+    },
+    {
+      "prompt": "Implement a REST endpoint in FastAPI for uploading a file and storing it in S3",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5183492302894592,
+      "ms": 13.09,
+      "ok": true
+    },
+    {
+      "prompt": "Convert this JavaScript callback-based code to async/await",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5586574077606201,
+      "ms": 12.87,
+      "ok": true
+    },
+    {
+      "prompt": "Add a Dockerfile and docker-compose.yml for a Node.js app with a Postgres database",
+      "expected": "coding",
+      "got": "reasoning",
+      "confidence": 0.5261621475219727,
+      "ms": 18.87,
+      "ok": false
+    },
+    {
+      "prompt": "Write a bash script that backs up a folder to a timestamped tar.gz and deletes backups older than 7 days",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5931157469749451,
+      "ms": 20.69,
+      "ok": true
+    },
+    {
+      "prompt": "Design the clean architecture folder structure for an order fulfillment service with CQRS and MediatR",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5622354745864868,
+      "ms": 18.33,
+      "ok": true
+    },
+    {
+      "prompt": "Write unit tests with pytest for a function that parses CSV rows into dataclasses",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5739224553108215,
+      "ms": 22.48,
+      "ok": true
+    },
+    {
+      "prompt": "Implement a constant-time string comparison helper in C# for comparing API keys",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5433443784713745,
+      "ms": 18.44,
+      "ok": true
+    },
+    {
+      "prompt": "My React component re-renders infinitely when I call setState inside useEffect, fix it",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.6135466694831848,
+      "ms": 20.68,
+      "ok": true
+    },
+    {
+      "prompt": "Write a regex to extract all email addresses from a text file and a Python script that uses it",
+      "expected": "coding",
+      "got": "reasoning",
+      "confidence": 0.5051259994506836,
+      "ms": 20.57,
+      "ok": false
+    },
+    {
+      "prompt": "Create a GitHub Actions workflow that builds and tests a .NET 8 solution on every pull request",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5268166065216064,
+      "ms": 16.77,
+      "ok": true
+    },
+    {
+      "prompt": "Audit this HMAC-SHA256 signature verification function for timing attacks and constant-time safety",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.6417946219444275,
+      "ms": 16.19,
+      "ok": false
+    },
+    {
+      "prompt": "Analyze this authentication handshake for timing attack vulnerabilities and race conditions",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.5855284333229065,
+      "ms": 17.39,
+      "ok": false
+    },
+    {
+      "prompt": "Prove that the square root of 2 is irrational",
+      "expected": "reasoning",
+      "got": "reasoning",
+      "confidence": 0.5176723003387451,
+      "ms": 13.41,
+      "ok": true
+    },
+    {
+      "prompt": "Is this double-checked locking implementation thread-safe under the Java memory model? Explain step by step",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.5305220484733582,
+      "ms": 14.89,
+      "ok": false
+    },
+    {
+      "prompt": "A bat and a ball cost $1.10 in total. The bat costs $1 more than the ball. How much does the ball cost? Reason carefully",
+      "expected": "reasoning",
+      "got": "reasoning",
+      "confidence": 0.6168637275695801,
+      "ms": 19.07,
+      "ok": true
+    },
+    {
+      "prompt": "Evaluate whether this JWT validation logic is vulnerable to algorithm confusion attacks",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.6508941054344177,
+      "ms": 16.64,
+      "ok": false
+    },
+    {
+      "prompt": "What is the time complexity of this recursive algorithm? Prove it using the master theorem",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.5480378866195679,
+      "ms": 16.52,
+      "ok": false
+    },
+    {
+      "prompt": "Find the flaw in this argument: all prime numbers are odd, therefore 2 is not prime",
+      "expected": "reasoning",
+      "got": "reasoning",
+      "confidence": 0.5602092146873474,
+      "ms": 14.73,
+      "ok": true
+    },
+    {
+      "prompt": "Model the threat surface of a password reset flow that sends tokens via email and rank the risks",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.6384193897247314,
+      "ms": 13.35,
+      "ok": false
+    },
+    {
+      "prompt": "Explain why this lock-free queue can suffer from the ABA problem and how to prove a fix is correct",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.5885373950004578,
+      "ms": 15.71,
+      "ok": false
+    },
+    {
+      "prompt": "A train leaves at 3pm at 60 km/h and another leaves the same station at 4pm at 90 km/h on the same track. When does the second catch up? Show your reasoning",
+      "expected": "reasoning",
+      "got": "reasoning",
+      "confidence": 0.5185725688934326,
+      "ms": 22.31,
+      "ok": true
+    },
+    {
+      "prompt": "Is the Diffie-Hellman exchange in this protocol vulnerable to a man-in-the-middle attack? Analyze the assumptions",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.5638185739517212,
+      "ms": 23.73,
+      "ok": false
+    },
+    {
+      "prompt": "Determine whether this smart contract withdraw function is vulnerable to reentrancy and explain the attack sequence",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.5805414319038391,
+      "ms": 18.57,
+      "ok": false
+    },
+    {
+      "prompt": "Prove by induction that the sum of the first n odd numbers is n squared",
+      "expected": "reasoning",
+      "got": "reasoning",
+      "confidence": 0.7136289477348328,
+      "ms": 14.66,
+      "ok": true
+    },
+    {
+      "prompt": "Analyze this token generator for predictability given that it seeds Random with the current time",
+      "expected": "reasoning",
+      "got": "coding",
+      "confidence": 0.5757123827934265,
+      "ms": 12.46,
+      "ok": false
+    },
+    {
+      "prompt": "hello, how are you?",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.8036687970161438,
+      "ms": 11.38,
+      "ok": true
+    },
+    {
+      "prompt": "Summarize the key differences between REST and GraphQL in three bullet points",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5110896825790405,
+      "ms": 14.46,
+      "ok": true
+    },
+    {
+      "prompt": "What's a good name for a coffee shop that also sells books?",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.7534812092781067,
+      "ms": 11.26,
+      "ok": true
+    },
+    {
+      "prompt": "Translate 'good morning, see you tomorrow' into Spanish and French",
+      "expected": "coding",
+      "got": "reasoning",
+      "confidence": 0.6472922563552856,
+      "ms": 11.15,
+      "ok": false
+    },
+    {
+      "prompt": "Explain what Docker is to a non-technical manager",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5863850116729736,
+      "ms": 14.65,
+      "ok": true
+    },
+    {
+      "prompt": "Write a short friendly email to my team announcing that Friday's meeting is moved to 3pm",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.8448231220245361,
+      "ms": 15.77,
+      "ok": true
+    },
+    {
+      "prompt": "What are the pros and cons of working remotely?",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.8998258113861084,
+      "ms": 13.1,
+      "ok": true
+    },
+    {
+      "prompt": "Give me a 3-day itinerary for visiting Istanbul",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.6476456522941589,
+      "ms": 10.83,
+      "ok": true
+    },
+    {
+      "prompt": "What does the acronym SOLID stand for?",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.5793394446372986,
+      "ms": 10.22,
+      "ok": true
+    },
+    {
+      "prompt": "thanks, that was helpful!",
+      "expected": "coding",
+      "got": "coding",
+      "confidence": 0.7203807830810547,
+      "ms": 9.99,
+      "ok": true
+    }
+  ]
+}

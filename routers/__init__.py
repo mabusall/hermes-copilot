@@ -10,7 +10,7 @@ BACKENDS = ("semantic", "routellm", "laya")
 
 def get_backend(name: str) -> RouterBackend:
     if name == "semantic":
-        from .semantic import SemanticBackend
+        from .semantic_backend import SemanticBackend
         return SemanticBackend()
     if name == "routellm":
         from .routellm_backend import RouteLLMBackend

@@ -14,6 +14,7 @@ import os
 import json
 import time
 import asyncio
+from contextlib import asynccontextmanager
 from typing import Optional, Dict, Any, List
 
 import httpx
@@ -30,8 +31,6 @@ PROXY_PORT = 8000
 ROUTER_BACKEND = os.getenv("ROUTER_BACKEND", "semantic")
 LOG_FILE = os.getenv("PROXY_LOG_FILE", "/workspace/proxy.log")
 DEBUG_ROLES = os.getenv("PROXY_DEBUG_ROLES", "1") == "1"        # log message structure (no content) per request
-
-app = FastAPI(title="Hermes Copilot Universal Autonomous Proxy")
 
 backend = get_backend(ROUTER_BACKEND)
 fleet = Fleet(OLLAMA_BASE)
@@ -72,11 +71,15 @@ async def _load_backend() -> None:
         log(f"❌ Router backend '{backend.name}' failed to load: {backend_load_error}")
 
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """Loads the router backend in the background; requests wait for it instead of failing."""
     global backend_load_task
     backend_load_task = asyncio.create_task(_load_backend())
+    yield
+
+
+app = FastAPI(title="Hermes Copilot Universal Autonomous Proxy", lifespan=lifespan)
 
 
 def make_error_stream(err_msg: str):

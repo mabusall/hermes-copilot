@@ -3,7 +3,7 @@
 This production guide provides a step-by-step Standard Operating Procedure (SOP) to deploy **Hermes Agent** in an isolated Docker sandbox. The environment is configured with:
 - An interactive **Web UI Dashboard** accessible on your host machine.
 - Seamless **GitHub** integration for autonomous code review and PR workflows.
-- A built-in **Hermes Copilot Auto-Proxy** that dynamically routes between local Ollama models (`qwen2.5-coder:14b`, `deepseek-r1:14b`) based on task intent and difficulty — using an in-process System 1 Router (Semantic Router / FastEmbed ONNX on CPU) that delivers < 60ms routing with 0 MB Ollama GPU VRAM and live in-chat visual badges.
+- A built-in **Hermes Copilot Auto-Proxy** (`copilot/hermes_proxy_*.py`) that dynamically routes between local Ollama models (`qwen2.5-coder:14b`, `deepseek-r1:14b`) based on task intent and difficulty — offering **three standalone CPU System 1 Router editions** (**Semantic Router**, **Laya / Jev**, and **RouteLLM**) with **0 MB Ollama GPU VRAM** and live in-chat visual badges.
 
 ---
 
@@ -22,10 +22,11 @@ This production guide provides a step-by-step Standard Operating Procedure (SOP)
 │  CONTAINER: hermes-sandbox-pro       │     │  CONTAINER: ollama-sandbox-pro   │
 │  - Hermes Agent Runtime & Web UI     │     │  - Port 11434 (GPU Accelerated)  │
 │    (Model set to "auto")             │     │  - Local Models:                 │
-│  - Auto-Proxy (hermes_proxy.py:8000) │────▶│    • qwen2.5-coder:14b (Coding)  │
-│    • Semantic Router (In-Process CPU)│     │    • deepseek-r1:14b (Security)  │
-│  - Workspace Volume (/workspace)     │     │  - 100% Dedicated GPU VRAM       │
-│  - Dev Tools: Git, GitHub CLI        │     └──────────────────────────────────┘
+│  - Auto-Proxy (:8000, CPU System 1): │────▶│    • qwen2.5-coder:14b (Coding)  │
+│    • copilot/hermes_proxy_semantic.py│     │    • deepseek-r1:14b (Security)  │
+│    • copilot/hermes_proxy_laya.py    │     │  - 100% Dedicated GPU VRAM       │
+│    • copilot/hermes_proxy_routellm.py│     │    (OLLAMA_MAX_LOADED_MODELS=1)  │
+│  - Workspace Volume (/workspace)     │     └──────────────────────────────────┘
 └──────────────────────────────────────┘
 ```
 
@@ -98,44 +99,50 @@ docker exec hermes-sandbox-pro /usr/local/lib/hermes-agent/venv/bin/python3 -m p
 
 ---
 
-## Step 5: Pull Required Models in Ollama
+## Step 5: Pull Required Execution Models in Ollama
 
-Ensure the GPU-accelerated Ollama container has the required local models pulled. Run from Windows PowerShell:
+Ensure the GPU-accelerated Ollama container has the 2-tier execution fleet pulled (routing runs on CPU inside `hermes-sandbox-pro`, so no router LLM is needed in Ollama). Run from Windows PowerShell:
 
 ```powershell
-# 1. Orchestrator Brain (< 60ms classification, ~980MB VRAM)
-docker exec -it ollama-sandbox-pro ollama pull qwen2.5:1.5b
-
-# 2. Daily software engineering, coding & unit tests (~9GB)
+# 1. Daily software engineering, coding, architecture & unit tests (~9GB)
 docker exec -it ollama-sandbox-pro ollama pull qwen2.5-coder:14b
 
-# 3. Deep reasoning, security audits, cryptography & logic proofs (~9GB)
+# 2. Deep reasoning, security audits, cryptography & logic proofs (~9GB)
 docker exec -it ollama-sandbox-pro ollama pull deepseek-r1:14b
 ```
 
 ---
 
-## Step 6: Deploy Hermes Copilot Auto-Proxy (`hermes_proxy.py`)
+## Step 6: Deploy Hermes Copilot Auto-Proxy (Choose Your Router Edition)
 
-The **Hermes Copilot Auto-Proxy** acts as an intelligent OpenAI-compatible reverse proxy running locally inside `hermes-sandbox-pro` on port `8000`.
+The **Hermes Copilot Auto-Proxy** acts as an intelligent OpenAI-compatible reverse proxy running locally inside `hermes-sandbox-pro` on port `8000`. You can choose between **3 standalone router editions** in `/workspace/copilot/`:
 
-### 1. Ensure `hermes_proxy.py` is in `/workspace/`
-The repository file `hermes_proxy.py` maps automatically to `/workspace/hermes_proxy.py` inside the container via your Docker volume (`D:\Data\Docker Data\Hermes`).
+| Edition | Script | Latency (p50) | Accuracy (3-Class / 2-Model) | CPU RAM | Venv Path |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **1. Semantic Router** *(Recommended)* | `/workspace/copilot/hermes_proxy_semantic.py` | **5.58 ms** | **87.5% / 97.5%** | **+340 MB** | `/opt/router-venvs/semantic` |
+| **2. Laya (formerly Jev)** | `/workspace/copilot/hermes_proxy_laya.py` | **241.2 ms** | **92.5% / 92.5%** | **+1,990 MB** | `/opt/router-venvs/laya` |
+| **3. RouteLLM (LMSYS BERT)** | `/workspace/copilot/hermes_proxy_routellm.py` | **14.81 ms** | **67.5% / 67.5%** | **+1,210 MB** | `/opt/router-venvs/routellm` |
 
-### 2. Launch the Auto-Proxy in the Background
+### Launch Your Chosen Auto-Proxy Edition in the Background
 
-**From Windows PowerShell:**
+The automated switcher manages isolated virtual environments, CPU dependencies, copying, and background daemon execution with one command:
+
 ```powershell
-docker exec -d hermes-sandbox-pro nohup /opt/router-venvs/semantic/bin/python /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1
-```
+# Launch Semantic Router Edition (Recommended Default: ~5.6ms, ~340MB RAM):
+docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh semantic
 
-**Or from inside the container shell (`root@...:/#`):**
-```bash
-nohup /opt/router-venvs/semantic/bin/python /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1 &
+# Or switch to Laya / Jev Edition (Highest 3-Class Accuracy: ~241ms, ~2GB RAM):
+docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh laya
+
+# Or switch to RouteLLM Edition (LMSYS Arena BERT Classifier: ~14.8ms, ~1.2GB RAM):
+docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh routellm
+
+# Check active router status & health at any time:
+docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh status
 ```
 
 > [!TIP]
-> The proxy logs every routing decision, model assignment, and latency benchmark to `/workspace/proxy.log` (accessible on your Windows host at `D:\Data\Docker Data\Hermes\proxy.log`), and automatically injects visual routing badges into your chat stream.
+> The proxy logs every routing decision, model assignment, and latency benchmark to `/workspace/proxy.log` (accessible on your Windows host at `D:\Data\Docker Data\Hermes\proxy.log`), and automatically injects visual routing badges (`> 🧭 [Auto Router • <Edition>] ...`) into your chat stream.
 
 ### 3. Verify Proxy Health
 From Windows PowerShell:
@@ -269,8 +276,8 @@ When restarting your Windows machine, do **not** recreate the containers. Run th
 docker start ollama-sandbox-pro
 docker start hermes-sandbox-pro
 
-# 2. Launch the Auto-Proxy daemon in the background:
-docker exec -d hermes-sandbox-pro nohup /usr/local/lib/hermes-agent/venv/bin/python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1
+# 2. Launch your preferred Auto-Proxy daemon in the background (e.g. Semantic Router edition):
+docker exec -d hermes-sandbox-pro bash -c "nohup /opt/router-venvs/semantic/bin/python /workspace/copilot/hermes_proxy_semantic.py > /workspace/proxy.log 2>&1 &"
 
 # 3. Launch the Hermes Web UI Dashboard in the background:
 docker exec -d hermes-sandbox-pro nohup hermes dashboard --host 0.0.0.0 > /workspace/dashboard.log 2>&1
