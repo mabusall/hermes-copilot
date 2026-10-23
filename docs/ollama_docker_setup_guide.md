@@ -1,6 +1,6 @@
 # Ollama Docker Setup Guide & 2-Tier Local Fleet Infrastructure
 
-This Standard Operating Procedure (SOP) provides a complete, reproducible guide to deploying **Ollama** in Docker with full NVIDIA GPU acceleration. It establishes the 2-tier local execution fleet designed to power the **Hermes Copilot** ecosystem — while prompt routing runs entirely in Python on CPU via your choice of three System 1 Auto-Routers (**Semantic Router**, **Laya / Jev**, or **RouteLLM**), dedicating 100% of GPU VRAM to the active task model.
+This Standard Operating Procedure (SOP) provides a complete, reproducible guide to deploying **Ollama** in Docker with full NVIDIA GPU acceleration. It establishes the 2-tier local execution fleet designed to power the **Hermes Copilot** ecosystem — while prompt routing runs entirely in Python on CPU via your choice of three System 1 Auto-Routers (**Semantic Router**, **Laya**, or **RouteLLM**), dedicating 100% of GPU VRAM to the active task model.
 
 ---
 

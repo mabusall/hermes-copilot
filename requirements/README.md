@@ -21,7 +21,7 @@ If you prefer installing dependencies manually using `pip` or `uv`:
 
 ---
 
-### 2. Laya (formerly Jev)
+### 2. Laya
 * **File:** [`laya.txt`](laya.txt)
 * **Footprint:** ~2.0 GB RAM (CPU-only PyTorch + 421M ModernBERT)
 * **Command:**

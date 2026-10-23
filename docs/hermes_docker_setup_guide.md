@@ -3,7 +3,7 @@
 This production guide provides a step-by-step Standard Operating Procedure (SOP) to deploy **Hermes Agent** in an isolated Docker sandbox. The environment is configured with:
 - An interactive **Web UI Dashboard** accessible on your host machine.
 - Seamless **GitHub** integration for autonomous code review and PR workflows.
-- A built-in **Hermes Copilot Auto-Proxy** (`copilot/hermes_proxy_*.py`) that dynamically routes between local Ollama models (`qwen2.5-coder:14b`, `deepseek-r1:14b`) based on task intent and difficulty — offering **three standalone CPU System 1 Router editions** (**Semantic Router**, **Laya / Jev**, and **RouteLLM**) with **0 MB Ollama GPU VRAM** and live in-chat visual badges.
+- A built-in **Hermes Copilot Auto-Proxy** (`copilot/hermes_proxy_*.py`) that dynamically routes between local Ollama models (`qwen2.5-coder:14b`, `deepseek-r1:14b`) based on task intent and difficulty — offering **three standalone CPU System 1 Router editions** (**Semantic Router**, **Laya**, and **RouteLLM**) with **0 MB Ollama GPU VRAM** and live in-chat visual badges.
 
 ---
 
@@ -120,7 +120,7 @@ The **Hermes Copilot Auto-Proxy** acts as an intelligent OpenAI-compatible rever
 | Edition | Script | Latency (p50) | Accuracy (3-Class / 2-Model) | CPU RAM | Venv Path |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1. Semantic Router** *(Recommended)* | `/workspace/copilot/hermes_proxy_semantic.py` | **5.58 ms** | **87.5% / 97.5%** | **+340 MB** | `/opt/router-venvs/semantic` |
-| **2. Laya (formerly Jev)** | `/workspace/copilot/hermes_proxy_laya.py` | **241.2 ms** | **92.5% / 92.5%** | **+1,990 MB** | `/opt/router-venvs/laya` |
+| **2. Laya** | `/workspace/copilot/hermes_proxy_laya.py` | **241.2 ms** | **92.5% / 92.5%** | **+1,990 MB** | `/opt/router-venvs/laya` |
 | **3. RouteLLM (LMSYS BERT)** | `/workspace/copilot/hermes_proxy_routellm.py` | **14.81 ms** | **67.5% / 67.5%** | **+1,210 MB** | `/opt/router-venvs/routellm` |
 
 ### Launch Your Chosen Auto-Proxy Edition in the Background
@@ -131,7 +131,7 @@ The automated switcher manages isolated virtual environments, CPU dependencies, 
 # Launch Semantic Router Edition (Recommended Default: ~5.6ms, ~340MB RAM):
 docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh semantic
 
-# Or switch to Laya / Jev Edition (Highest 3-Class Accuracy: ~241ms, ~2GB RAM):
+# Or switch to Laya Edition (Highest 3-Class Accuracy: ~241ms, ~2GB RAM):
 docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh laya
 
 # Or switch to RouteLLM Edition (LMSYS Arena BERT Classifier: ~14.8ms, ~1.2GB RAM):

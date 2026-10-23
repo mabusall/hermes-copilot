@@ -8,7 +8,7 @@ Move the routing decision **out of Ollama**—ending the brain/worker VRAM evict
 
 1. **Semantic Router** (`copilot/hermes_proxy_semantic.py` — Aurelio AI + FastEmbed `BAAI/bge-small-en-v1.5` ONNX): embedding similarity
 2. **RouteLLM** (`copilot/hermes_proxy_routellm.py` — LMSYS `routellm/bert_gpt4_augmented`): strong/weak difficulty classifier
-3. **Laya (formerly Jev)** (`copilot/hermes_proxy_laya.py` — Convai Innovations `convaiinnovations/laya` 421M ModernBERT): non-autoregressive `choice` decision model
+3. **Laya** (`copilot/hermes_proxy_laya.py` — Convai Innovations `convaiinnovations/laya` 421M ModernBERT): non-autoregressive `choice` decision model
 
 Baseline: the legacy Ollama LLM brain (`qwen2.5:1.5b`), run on the same prompt set for direct comparison before deprecation.
 
@@ -29,8 +29,7 @@ flowchart LR
 > **Measured Resource & Latency Realities (Intel Core i7-14650HX CPU, 32GB DDR5):**
 > - **Semantic Router** (`BAAI/bge-small-en-v1.5` ONNX): **+340.5 MB RAM**, **5.58 ms p50 / 7.22 ms p95** warm latency, **3.76 s** cold load. Zero PyTorch required.
 > - **RouteLLM** (`routellm/bert_gpt4_augmented` via CPU PyTorch): **+1,210.1 MB RAM**, **14.81 ms p50 / 22.31 ms p95** warm latency, **7.85 s** cold load.
-> - **Laya (formerly Jev)** (`convaiinnovations/laya` 421M ModernBERT-large via CPU PyTorch): **+1,990.2 MB RAM**, **241.19 ms p50 / 279.81 ms p95** warm latency, **4.44 s** cold load.
-> - **Jev = Laya Discovery:** Convai Innovations renamed/published the `jev` library (`convaiinnovations/jev`) on PyPI as `laya` (`convaiinnovations/laya`). Both share the exact same `load()`, `predict()`, and `router_questions()` APIs.
+> - **Laya** (`convaiinnovations/laya` 421M ModernBERT-large via CPU PyTorch): **+1,990.2 MB RAM**, **241.19 ms p50 / 279.81 ms p95** warm latency, **4.44 s** cold load.
 
 > [!WARNING]
 > **RouteLLM Routing Domain Nuance:**
@@ -76,7 +75,7 @@ flowchart LR
 | **0b** | **Baseline Benchmark**: Ollama LLM (`qwen2.5:1.5b`) on 40-prompt suite | ✅ Done | 92.5% accuracy (37/40), p50 284.1 ms latency. Deprecated & removed due to VRAM eviction risk. |
 | **1** | **Semantic Router**: Install FastEmbed + ONNX, configure domain utterances, benchmark | ✅ Done | **87.5%** 3-class accuracy (**97.5%** 2-model fleet accuracy), **5.58 ms** p50 latency, **+340.5 MB** RAM. |
 | **2** | **RouteLLM**: Install LMSYS BERT router (CPU), benchmark on 40-prompt suite | ✅ Done | **67.5%** accuracy (27/40), **14.81 ms** p50 latency, **7.85 s** cold load, **+1,210.1 MB** RAM. |
-| **3** | **Laya (Jev)**: Install Convai ModernBERT (CPU), refine choice criteria, benchmark | ✅ Done | **92.5%** 3-class accuracy (37/40; 100% coding, 100% general, 80% reasoning), **241.19 ms** p50 latency, **+1,990.2 MB** RAM. |
+| **3** | **Laya**: Install Convai ModernBERT (CPU), refine choice criteria, benchmark | ✅ Done | **92.5%** 3-class accuracy (37/40; 100% coding, 100% general, 80% reasoning), **241.19 ms** p50 latency, **+1,990.2 MB** RAM. |
 | **4** | **Live Hermes Validation**: Test live in `hermes_proxy.py` with multi-step prompt flow | ✅ Verified Live | Tested live in Hermes: 3 turns (Coder 77ms → DeepSeek 55ms → Coder 56ms). Pinning bug fixed, Chat UI badge working! |
 | **5** | **3 Standalone Versions & Final Documentation**: Create `copilot/` versions & update all docs | ✅ Ready for Review | All 3 proxy editions (`copilot/`), benchmark JSONs (`router_lab/results/`), and docs updated. Awaiting user review before commit. |
 
@@ -89,7 +88,7 @@ All benchmarks were executed inside `hermes-sandbox-pro` via `router_lab/bench.p
 | Backend | Proxy Script | 3-Class Accuracy | Effective 2-Model Dispatch Accuracy* | Warm Latency (p50 / p95) | Cold Load Time | VmRSS Delta (CPU RAM) | Ollama GPU VRAM | Verdict |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Semantic Router** | `copilot/hermes_proxy_semantic.py` | **87.5%** (35/40)<br/>*(15/15 code, 14/15 reason, 6/10 gen)* | **97.5%** (39/40) | **5.58 ms / 7.22 ms** | **3.76 s** | **+340.5 MB** | **0 MB** | 🏆 **Best Overall Speed, RAM & 2-Model Dispatch** |
-| **Laya (Jev)** | `copilot/hermes_proxy_laya.py` | **92.5%** (37/40)<br/>*(15/15 code, 12/15 reason, 10/10 gen)* | **92.5%** (37/40) | **241.2 ms / 279.8 ms** | **4.44 s** | **+1,990.2 MB** | **0 MB** | 🥇 **Highest Strict 3-Class Accuracy (Zero-Shot Choice)** |
+| **Laya** | `copilot/hermes_proxy_laya.py` | **92.5%** (37/40)<br/>*(15/15 code, 12/15 reason, 10/10 gen)* | **92.5%** (37/40) | **241.2 ms / 279.8 ms** | **4.44 s** | **+1,990.2 MB** | **0 MB** | 🥇 **Highest Strict 3-Class Accuracy (Zero-Shot Choice)** |
 | **RouteLLM (BERT)** | `copilot/hermes_proxy_routellm.py` | **67.5%** (27/40)*<br/>*(22/25 weak, 5/15 strong)* | **67.5%** (27/40) | **14.81 ms / 22.31 ms** | **7.85 s** | **+1,210.1 MB** | **0 MB** | ⚡ **Best for Generic Strong/Weak Arena Difficulty** |
 | *ollama-llm (legacy)* | *(Removed)* | *92.5% (37/40)* | *92.5% (37/40)* | *284.1 ms / 357.9 ms* | *0.97 s* | *+22.7 MB* | *~1,500 MB* | ❌ **Deprecated (Evicts worker model from GPU VRAM)** |
 
@@ -102,7 +101,7 @@ All benchmarks were executed inside `hermes-sandbox-pro` via `router_lab/bench.p
 * **Choose Semantic Router (`copilot/hermes_proxy_semantic.py`) — *Recommended Default***
   - **Why:** Blazing fast (**5.6 ms**), ultra-lightweight (**~340 MB RAM**, ONNX runtime without PyTorch), and achieves **97.5% effective model-dispatch accuracy** for the 2-model fleet (`qwen2.5-coder:14b` + `deepseek-r1:14b`).
 * **Choose Laya (`copilot/hermes_proxy_laya.py`)**
-  - **Why:** Highest strict 3-way classification accuracy (**92.5%**, including **100%** on `coding` and **100%** on `general`) using Convai's 421M ModernBERT System 1 decision engine (`convaiinnovations/laya`, formerly Jev) with zero-shot natural-language criteria. Ideal if you run a 3-model fleet (`coding` + `reasoning` + `general`) and have ~2 GB of spare CPU RAM.
+  - **Why:** Highest strict 3-way classification accuracy (**92.5%**, including **100%** on `coding` and **100%** on `general`) using Convai's 421M ModernBERT System 1 decision engine (`convaiinnovations/laya`) with zero-shot natural-language criteria. Ideal if you run a 3-model fleet (`coding` + `reasoning` + `general`) and have ~2 GB of spare CPU RAM.
 * **Choose RouteLLM (`copilot/hermes_proxy_routellm.py`)**
   - **Why:** Trained on LMSYS Chatbot Arena battles (`routellm/bert_gpt4_augmented`) to estimate general prompt complexity (`win_rate >= threshold`) in **~15 ms**. Useful if you want a pure strong-vs-weak complexity threshold (`ROUTELLM_THRESHOLD`) without maintaining domain utterances.
 

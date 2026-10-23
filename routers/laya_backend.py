@@ -1,6 +1,6 @@
 """
 Laya backend: Convai Innovations' 421M ModernBERT non-autoregressive System 1 decision engine
-(convaiinnovations/laya, formerly Jev).
+(convaiinnovations/laya).
 Classifies prompts into coding, reasoning, or general in a single CPU forward pass with
 temperature-calibrated probabilities.
 """

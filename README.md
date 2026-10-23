@@ -1,13 +1,13 @@
 # 🤖 Hermes Copilot: Auto Local Models Router & Proxy
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Author: Mohannad Abu Sall](https://img.shields.io/badge/Author-Mohannad%20Abu%20Sall-blue.svg)](https://github.com/mabusall)
+[![Author: Mohannad Abu Sall](https://img.shields.io/badge/Author-Mohannad_Abu_Sall-blue.svg)](https://github.com/mabusall)
 [![Hermes Agent](https://img.shields.io/badge/Agent-Hermes--Sandbox-orange.svg)](https://github.com/NousResearch/hermes-agent)
 [![Ollama](https://img.shields.io/badge/Engine-Ollama-black.svg)](https://ollama.com)
 [![Hardware](https://img.shields.io/badge/GPU-RTX%204060%20%2F%205060%20(8GB%20VRAM)-green.svg)](https://www.nvidia.com)
 
 > **GitHub Copilot "Auto-Mode" for 100% Offline, Local LLMs.**  
-> Dynamically evaluates user prompts in **milliseconds on CPU** using your choice of **three in-process System 1 Routers** (**Semantic Router**, **RouteLLM**, or **Laya / Jev**) and automatically routes to the best specialized local Ollama model — zero cloud costs, zero privacy leaks, and **0 MB GPU VRAM** wasted on routing.
+> Dynamically evaluates user prompts in **milliseconds on CPU** using your choice of **three in-process System 1 Routers** (**Semantic Router**, **RouteLLM**, or **Laya**) and automatically routes to the best specialized local Ollama model — zero cloud costs, zero privacy leaks, and **0 MB GPU VRAM** wasted on routing.
 
 ---
 
@@ -19,7 +19,7 @@ When using autonomous coding agents locally on consumer hardware (e.g., **8GB VR
 
 **Hermes Copilot** solves both with an OpenAI-compatible **Auto-Proxy** offered in **3 standalone editions** (`copilot/`) plus a universal configurable entry point (`hermes_proxy.py`):
 * **100% CPU In-Process Routing (0 MB GPU VRAM):** The router runs entirely inside the Python proxy process on CPU, leaving **100% of your GPU VRAM** dedicated to the active Ollama worker model (`OLLAMA_MAX_LOADED_MODELS=1`).
-* **3 Pluggable System 1 Engines:** Choose between **Semantic Router** (FastEmbed ONNX), **Laya / Jev** (Convai 421M ModernBERT), or **RouteLLM** (LMSYS BERT classifier).
+* **3 Pluggable System 1 Engines:** Choose between **Semantic Router** (FastEmbed ONNX), **Laya** (Convai 421M ModernBERT), or **RouteLLM** (LMSYS BERT classifier).
 * **Live In-Chat UI Badge:** Injects real-time routing transparency at the top of every chat response:
   `> 🧭 **[Auto Router • Semantic]** Using **`qwen2.5-coder:14b`** *(Task: `coding` • 5.6ms)*`
 * **Native `model: auto` Experience:** Select `auto` once in the Hermes Web UI or TUI, just like VS Code GitHub Copilot.
@@ -35,14 +35,14 @@ We benchmarked all three System 1 routers head-to-head on our 40-prompt evaluati
 | Router Edition | Standalone Script | 3-Class Accuracy | 2-Model Dispatch Accuracy* | Warm Latency (p50 / p95) | Cold Load | CPU RAM Delta | GPU VRAM | Best For |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1. Semantic Router** *(Recommended)* | `copilot/hermes_proxy_semantic.py` | **87.5%** (35/40) | **97.5%** (39/40) | **5.58 ms / 7.22 ms** | **3.76 s** | **+340.5 MB** | **0 MB** | 🏆 **Fastest speed, lowest RAM (no PyTorch), best 2-model accuracy** |
-| **2. Laya (formerly Jev)** | `copilot/hermes_proxy_laya.py` | **92.5%** (37/40) | **92.5%** (37/40) | **241.2 ms / 279.8 ms** | **4.44 s** | **+1,990.2 MB** | **0 MB** | 🥇 **Highest strict 3-class accuracy (`coding` vs `reasoning` vs `general`)** |
+| **2. Laya** | `copilot/hermes_proxy_laya.py` | **92.5%** (37/40) | **92.5%** (37/40) | **241.2 ms / 279.8 ms** | **4.44 s** | **+1,990.2 MB** | **0 MB** | 🥇 **Highest strict 3-class accuracy (`coding` vs `reasoning` vs `general`)** |
 | **3. RouteLLM (LMSYS BERT)** | `copilot/hermes_proxy_routellm.py` | **67.5%** (27/40) | **67.5%** (27/40) | **14.81 ms / 22.31 ms** | **7.85 s** | **+1,210.1 MB** | **0 MB** | ⚡ **Generic Chatbot Arena strong/weak difficulty threshold** |
 
 *\*In the standard 2-model fleet (`qwen2.5-coder:14b` + `deepseek-r1:14b`), both `coding` and `general` prompts route to `qwen2.5-coder:14b`, while `reasoning` routes to `deepseek-r1:14b`. Semantic Router dispatches **39/40 (97.5%)** prompts to the exact right worker model.*
 
 ### How to Decide Which Router is Best for You
 1. **Pick Semantic Router (`copilot/hermes_proxy_semantic.py`)** if you want **instant ~5ms routing**, minimal CPU RAM (**~340 MB** via ONNX Runtime without PyTorch), and **97.5% effective accuracy** across `qwen2.5-coder:14b` and `deepseek-r1:14b`.
-2. **Pick Laya (`copilot/hermes_proxy_laya.py`)** if you run a **3-model fleet** (separate models for `coding`, `reasoning`, and `general` chat), have ~2 GB of spare system RAM, and want zero-shot natural-language criteria powered by Convai's 421M ModernBERT System 1 engine (`convaiinnovations/laya`, formerly `jev`).
+2. **Pick Laya (`copilot/hermes_proxy_laya.py`)** if you run a **3-model fleet** (separate models for `coding`, `reasoning`, and `general` chat), have ~2 GB of spare system RAM, and want zero-shot natural-language criteria powered by Convai's 421M ModernBERT System 1 engine (`convaiinnovations/laya`).
 3. **Pick RouteLLM (`copilot/hermes_proxy_routellm.py`)** if you prefer LMSYS's Chatbot Arena BERT classifier (`routellm/bert_gpt4_augmented`) that scores general prompt complexity (`win_rate >= threshold`) in **~15ms**.
 
 ---
@@ -129,7 +129,7 @@ The automated switcher manages isolated virtual environments, CPU dependencies, 
 # Launch Semantic Router (Default & Recommended: 5.6ms, ~340MB RAM):
 docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh semantic
 
-# Or switch to Laya / Jev (Highest 3-Class Accuracy: ~241ms, ~2GB RAM):
+# Or switch to Laya (Highest 3-Class Accuracy: ~241ms, ~2GB RAM):
 docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh laya
 
 # Or switch to RouteLLM (LMSYS Arena BERT Classifier: ~14.8ms, ~1.2GB RAM):
@@ -185,7 +185,7 @@ hermes-copilot/
 ├── copilot/                               # 3 Standalone Auto-Proxy Editions
 │   ├── hermes_proxy_semantic.py           # Edition 1: Semantic Router (FastEmbed ONNX, ~5.6ms)
 │   ├── hermes_proxy_routellm.py           # Edition 2: RouteLLM (LMSYS BERT, ~14.8ms)
-│   └── hermes_proxy_laya.py               # Edition 3: Laya / Jev (Convai ModernBERT, ~241ms)
+│   └── hermes_proxy_laya.py               # Edition 3: Laya (Convai ModernBERT, ~241ms)
 ├── scripts/                               # Automation & lifecycle scripts
 │   └── switch_router.sh                   # 1-command router installer, switcher & health checker
 ├── requirements/                          # Per-router isolated requirements
@@ -199,7 +199,7 @@ hermes-copilot/
 │   ├── fleet.py                           # Dynamic Ollama capability profiler (zero hardcoding)
 │   ├── semantic_backend.py                # Aurelio AI Semantic Router + FastEmbed ONNX adapter
 │   ├── routellm_backend.py                # LMSYS RouteLLM BERTRouter adapter
-│   └── laya_backend.py                    # Convai Laya (Jev) ModernBERT choice adapter
+│   └── laya_backend.py                    # Convai Laya ModernBERT choice adapter
 ├── router_lab/                            # Offline benchmarking suite & recorded measurements
 │   ├── bench.py                           # Automated accuracy, latency (p50/p95), and RAM runner
 │   ├── prompts.jsonl                      # 40-prompt labeled evaluation dataset

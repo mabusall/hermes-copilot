@@ -10,7 +10,7 @@ Instead of manually guessing models, switching configs, or running rigid linear 
 
 When you submit a prompt in the Hermes Chat, TUI, or Web UI dashboard:
 1. The request is intercepted by the local **Hermes Auto-Proxy** on port `8000`.
-2. An in-process **System 1 Router** (**Semantic Router**, **Laya / Jev**, or **RouteLLM** running on CPU) evaluates the prompt intent in milliseconds with **0 MB GPU VRAM**.
+2. An in-process **System 1 Router** (**Semantic Router**, **Laya**, or **RouteLLM** running on CPU) evaluates the prompt intent in milliseconds with **0 MB GPU VRAM**.
 3. A dynamic **Fleet Profiler** (`routers/fleet.py`) inspects Ollama model capabilities (`thinking` for reasoning, `tools` for coding/tools) and pairs the intent with the best installed model.
 4. The proxy dynamically rewrites `model: "auto"` to the chosen model, injects a **visual status badge** into the chat stream, and streams the worker model directly into Hermes.
 
@@ -54,7 +54,7 @@ Hermes Copilot ships with **three dedicated standalone proxy scripts** inside `c
 | Edition | Script Path | Engine / Backbone | 3-Class Accuracy | 2-Model Dispatch Accuracy* | Warm Latency (p50 / p95) | Cold Load | CPU RAM Delta | Chat Badge Prefix |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Semantic Router** *(Default)* | `copilot/hermes_proxy_semantic.py` | Aurelio AI + FastEmbed (`BAAI/bge-small-en-v1.5` ONNX) | **87.5%** (35/40) | **97.5%** (39/40) | **5.58 ms / 7.22 ms** | **3.76 s** | **+340.5 MB** | `🧭 [Auto Router • Semantic]` |
-| **Laya (formerly Jev)** | `copilot/hermes_proxy_laya.py` | Convai `convaiinnovations/laya` (421M ModernBERT-large) | **92.5%** (37/40) | **92.5%** (37/40) | **241.2 ms / 279.8 ms** | **4.44 s** | **+1,990.2 MB** | `🧭 [Auto Router • Laya]` |
+| **Laya** | `copilot/hermes_proxy_laya.py` | Convai `convaiinnovations/laya` (421M ModernBERT-large) | **92.5%** (37/40) | **92.5%** (37/40) | **241.2 ms / 279.8 ms** | **4.44 s** | **+1,990.2 MB** | `🧭 [Auto Router • Laya]` |
 | **RouteLLM** | `copilot/hermes_proxy_routellm.py` | LMSYS `routellm/bert_gpt4_augmented` (BERT Classifier) | **67.5%** (27/40) | **67.5%** (27/40) | **14.81 ms / 22.31 ms** | **7.85 s** | **+1,210.1 MB** | `🧭 [Auto Router • RouteLLM]` |
 
 *\*In a 2-model fleet (`qwen2.5-coder:14b` + `deepseek-r1:14b`), both `coding` and `general` categories route to `qwen2.5-coder:14b`, and `reasoning` routes to `deepseek-r1:14b`.*
@@ -64,8 +64,8 @@ Hermes Copilot ships with **three dedicated standalone proxy scripts** inside `c
 1. **Edition 1: Semantic Router (`copilot/hermes_proxy_semantic.py`) — *Recommended for Most Users***
    * **How it works:** Embeds incoming prompts using `BAAI/bge-small-en-v1.5` on ONNX Runtime (CPU) and computes cosine similarity against curated domain utterances (`coding`, `reasoning`, `general`) in `routers/semantic_backend.py`.
    * **Why choose it:** Requires **no PyTorch** (~340 MB RAM), classifies in **5.6 ms**, and achieves **97.5% (39/40)** effective model dispatch accuracy for the 2-model fleet.
-2. **Edition 2: Laya / Jev (`copilot/hermes_proxy_laya.py`) — *Best for 3-Model Fleets & Zero-Shot Criteria***
-   * **How it works:** Uses Convai Innovations' 421M ModernBERT non-autoregressive System 1 decision engine (`convaiinnovations/laya`, the official PyPI release of `jev`) to evaluate natural-language `choice` criteria in a single forward pass with calibrated probabilities (`routers/laya_backend.py`).
+2. **Edition 2: Laya (`copilot/hermes_proxy_laya.py`) — *Best for 3-Model Fleets & Zero-Shot Criteria***
+   * **How it works:** Uses Convai Innovations' 421M ModernBERT non-autoregressive System 1 decision engine (`convaiinnovations/laya`) to evaluate natural-language `choice` criteria in a single forward pass with calibrated probabilities (`routers/laya_backend.py`).
    * **Why choose it:** Achieves the **highest strict 3-way accuracy (92.5%: 100% coding, 100% general, 80% reasoning)** without needing example utterances—you simply describe each category in plain English.
 3. **Edition 3: RouteLLM (`copilot/hermes_proxy_routellm.py`) — *Best for Generic Arena Difficulty Thresholding***
    * **How it works:** Runs LMSYS's `BERTRouter` (`routellm/bert_gpt4_augmented`) trained on Chatbot Arena battles to predict the probability (`win_rate`) that a prompt requires a frontier/strong model (`routers/routellm_backend.py`).
@@ -118,7 +118,7 @@ The automated switcher manages isolated virtual environments, CPU dependencies, 
 # Semantic Router Edition (Recommended Default: ~5.6ms, ~340MB RAM):
 docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh semantic
 
-# Or Laya (Jev) Edition (Highest 3-Class Accuracy: ~241ms, ~2GB RAM):
+# Or Laya Edition (Highest 3-Class Accuracy: ~241ms, ~2GB RAM):
 docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh laya
 
 # Or RouteLLM Edition (LMSYS Arena BERT Classifier: ~14.8ms, ~1.2GB RAM):
