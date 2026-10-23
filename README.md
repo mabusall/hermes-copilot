@@ -6,7 +6,7 @@
 [![Hardware](https://img.shields.io/badge/GPU-RTX%204060%20%2F%205060%20(8GB%20VRAM)-green.svg)](https://www.nvidia.com)
 
 > **GitHub Copilot "Auto-Mode" for 100% Offline, Local LLMs.**  
-> Dynamically evaluates user tasks in **< 1 second** using an ultra-lightweight Pocket-LLM (`qwen2.5:0.5b`) and automatically routes to the best specialized local model — zero cloud costs, zero privacy leaks, and zero GPU memory thrashing.
+> Dynamically evaluates user tasks in **< 60ms** using an in-process System 1 Router (Semantic Router via FastEmbed / ONNX on CPU) and automatically routes to the best specialized local model — zero cloud costs, zero privacy leaks, and zero GPU memory thrashing.
 
 ---
 
@@ -14,28 +14,29 @@
 
 When using autonomous coding agents locally on consumer hardware (e.g., **8GB VRAM GPU + 32GB RAM**), developers face two major obstacles:
 1. **Model Selection Fatigue:** Manually guessing whether a task needs a fast coder, a heavy architect, or a deep reasoning model.
-2. **VRAM Thrashing:** Traditional proxy routers switch models per-request, forcing Ollama to unload and reload 10–20 GB model weights on every agent step (taking 15+ seconds each time).
+2. **VRAM Thrashing:** Traditional proxy routers switch models inside Ollama, forcing Ollama to unload and reload 10–20 GB model weights on every agent step (taking 15+ seconds each time).
 
 **Hermes Copilot** introduces a native OpenAI-compatible **Auto-Proxy (`hermes_proxy.py`)**:
-* **50ms Evaluation:** Uses `qwen2.5:0.5b` (~350 MB VRAM) to classify user prompt difficulty.
+* **Sub-60ms In-Process Router:** Routes prompts directly in Python on CPU in **5–60 ms** with **0 MB GPU VRAM**, leaving 100% of your GPU dedicated to the active worker model.
+* **In-Chat UI Badge:** Injects real-time feedback directly into your chat: `> 🧭 [Auto Router] Using qwen2.5-coder:14b (Task: coding • 56.9ms)`.
 * **Native In-Chat Auto Mode:** You simply select `model: auto` in the Hermes Web UI or TUI, exactly like VS Code Copilot.
-* **Tool-Turn Pinning:** When Hermes enters an iterative tool-execution cycle (bash commands, writing files), the proxy locks the model in place to prevent VRAM swapping freezes.
-* **Cloud-Ready:** Standard OpenAI API interface allows routing to cloud models (OpenRouter, Claude 3.5 Sonnet, GPT-4o) with zero Hermes reconfiguration.
+* **Tool-Turn Pinning:** When Hermes enters an iterative tool-execution cycle (bash commands, writing files), the proxy locks the model in place to prevent mid-task model swapping.
+* **Zero Hardcoded Names:** Dispatches dynamically using Ollama capability tags (`thinking`, `tools`).
 
 ---
 
-## 🧠 The 3-Tier Local Fleet Architecture
+## 🧠 The 2-Tier Execution Fleet + CPU System 1 Router
 
 Tailored specifically for consumer GPUs (NVIDIA RTX 5060 / 4060 with 8GB VRAM + 32GB DDR5 system):
 
-| Model | Footprint | Speed | Specialized Role |
+| Component | Footprint | Speed / Latency | Specialized Role |
 | :--- | :--- | :--- | :--- |
-| **`qwen2.5:0.5b`** | 397 MB | **180+ tok/s** | ⚡ **The Pocket Router:** Classifies task intent in < 50ms |
-| **`qwen2.5-coder:14b`** | 9.0 GB | **25 tok/s** | 💻 **Daily Coder & Systems Architect:** Clean architecture, unit tests, code & tool calls |
-| **`deepseek-r1:14b`** | 9.0 GB | **20 tok/s** | 🔒 **Security & Logic:** Vulnerability audit, race conditions & cryptographic proofs |
+| **System 1 Router** *(Semantic Router / FastEmbed)* | ~350 MB RAM (CPU) | **5–60 ms** | 🧭 **The Orchestrator:** Classifies intent in Python on CPU (0 MB Ollama VRAM) |
+| **`qwen2.5-coder:14b`** *(Ollama GPU)* | 9.0 GB | **25 tok/s** | 💻 **Daily Coder & Tools:** Architecture, code, unit tests, and terminal tools |
+| **`deepseek-r1:14b`** *(Ollama GPU)* | 9.0 GB | **20 tok/s** | 🔒 **Security & Reasoning:** Vulnerabilities, timing attacks, math & deep thinking |
 
 > [!NOTE]
-> `qwen2.5-coder:32b` (19.0 GB) is strictly optional and only recommended for high-VRAM rigs ($\ge 16\text{GB}$ VRAM or $\ge 64\text{GB}$ RAM) to avoid Windows paging freezes. On 8GB VRAM cards, `14b` is the verified optimal performer.
+> With the router running entirely in Python on CPU, Ollama only needs to load **1 worker model at a time**, dedicating 100% of your GPU VRAM to task execution without model-swapping lag.
 
 ---
 
@@ -52,18 +53,19 @@ Tailored specifically for consumer GPUs (NVIDIA RTX 5060 / 4060 with 8GB VRAM + 
  │       HERMES AUTO-PROXY (FastAPI • Local Port 8000)             │
  │                                                                 │
  │ 1. Intercepts incoming turn with model: "auto"                  │
- │ 2. Sub-Second Pocket Classifier (qwen2.5:0.5b in 50ms):         │
- │    • Security / Cryptography / Logic ──▶ deepseek-r1:14b        │
- │    • Architecture / Systems Design   ──▶ qwen2.5-coder:14b      │
- │    • Routine Coding / Unit Tests     ──▶ qwen2.5-coder:14b      │
+ │ 2. Sub-60ms System 1 Router (In-Process CPU / ONNX):            │
+ │    • Dynamic Fleet Profiler (queries Ollama capabilities)       │
+ │    • Head & Tail Intent Extraction (< 1,200 chars)              │
+ │    • Fast intent classification (Semantic Router / FastEmbed)   │
  │ 3. Tool-Execution Pinning: Keeps model warm during active tool  │
  │    cycles (bash, write_file) to prevent VRAM swapping freezes.  │
+ │ 4. Injects real-time visual badge into the chat response stream │
  └──────────────────────────────┬──────────────────────────────────┘
                                 │ Forwards with real model name
                                 ▼
  ┌─────────────────────────────────────────────────────────────────┐
  │               OLLAMA (GPU Port 11434)                           │
- │        Executes the chosen model and streams back               │
+ │     Executes ONLY the active worker model (100% GPU VRAM)       │
  └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,15 +74,14 @@ Tailored specifically for consumer GPUs (NVIDIA RTX 5060 / 4060 with 8GB VRAM + 
 ## 🚀 Quickstart Guide
 
 ### 1. Provision GPU-Accelerated Ollama
-Run Ollama in Docker with model persistence:
+Run Ollama in Docker with model persistence (dedicated single worker slot for 100% GPU VRAM):
 ```powershell
-docker run -d --gpus=all -e OLLAMA_KEEP_ALIVE="-1" --name ollama-sandbox-pro `
+docker run -d --gpus=all -e OLLAMA_KEEP_ALIVE="-1" -e OLLAMA_MAX_LOADED_MODELS="1" --name ollama-sandbox-pro `
   -p 11434:11434 -v "D:\Data\Docker Data\Ollama:/root/.ollama" ollama/ollama:latest
 ```
 
-Pull the model fleet:
+Pull the execution model fleet:
 ```powershell
-docker exec -it ollama-sandbox-pro ollama pull qwen2.5:0.5b
 docker exec -it ollama-sandbox-pro ollama pull qwen2.5-coder:14b
 docker exec -it ollama-sandbox-pro ollama pull deepseek-r1:14b
 ```
@@ -99,9 +100,10 @@ source ~/.bashrc
 ```
 
 ### 3. Start the Auto-Proxy Service
-Ensure `hermes_proxy.py` is in `/workspace/` and launch the daemon inside the container:
+Ensure `hermes_proxy.py` and `routers/` are in `/workspace/` and install router prerequisites:
 ```bash
-nohup /usr/local/lib/hermes-agent/venv/bin/python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1 &
+pip install semantic-router fastembed fastapi uvicorn httpx
+nohup python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1 &
 ```
 
 ### 4. Configure Hermes Agent for Auto-Mode

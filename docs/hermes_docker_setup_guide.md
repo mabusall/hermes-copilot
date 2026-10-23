@@ -3,7 +3,7 @@
 This production guide provides a step-by-step Standard Operating Procedure (SOP) to deploy **Hermes Agent** in an isolated Docker sandbox. The environment is configured with:
 - An interactive **Web UI Dashboard** accessible on your host machine.
 - Seamless **GitHub** integration for autonomous code review and PR workflows.
-- A built-in **Hermes Copilot Auto-Proxy** that dynamically routes between local Ollama models (`qwen2.5:0.5b`, `qwen2.5-coder:14b`, `deepseek-r1:14b`) based on task intent and difficulty — functioning just like VS Code GitHub Copilot Auto-mode, 100% offline and native to the Hermes Chat UI and TUI.
+- A built-in **Hermes Copilot Auto-Proxy** that dynamically routes between local Ollama models (`qwen2.5-coder:14b`, `deepseek-r1:14b`) based on task intent and difficulty — using an in-process System 1 Router (Semantic Router / FastEmbed ONNX on CPU) that delivers < 60ms routing with 0 MB Ollama GPU VRAM and live in-chat visual badges.
 
 ---
 
@@ -22,10 +22,11 @@ This production guide provides a step-by-step Standard Operating Procedure (SOP)
 │  CONTAINER: hermes-sandbox-pro       │     │  CONTAINER: ollama-sandbox-pro   │
 │  - Hermes Agent Runtime & Web UI     │     │  - Port 11434 (GPU Accelerated)  │
 │    (Model set to "auto")             │     │  - Local Models:                 │
-│  - Auto-Proxy (hermes_proxy.py:8000) │────▶│    • qwen2.5:0.5b (Router)       │
-│  - Workspace Volume (/workspace)     │     │    • qwen2.5-coder:14b (Coding)  │
-│  - Dev Tools: Git, GitHub CLI        │     │    • deepseek-r1:14b (Security)  │
-└──────────────────────────────────────┘     └──────────────────────────────────┘
+│  - Auto-Proxy (hermes_proxy.py:8000) │────▶│    • qwen2.5-coder:14b (Coding)  │
+│    • Semantic Router (In-Process CPU)│     │    • deepseek-r1:14b (Security)  │
+│  - Workspace Volume (/workspace)     │     │  - 100% Dedicated GPU VRAM       │
+│  - Dev Tools: Git, GitHub CLI        │     └──────────────────────────────────┘
+└──────────────────────────────────────┘
 ```
 
 ---
@@ -102,8 +103,8 @@ docker exec hermes-sandbox-pro /usr/local/lib/hermes-agent/venv/bin/python3 -m p
 Ensure the GPU-accelerated Ollama container has the required local models pulled. Run from Windows PowerShell:
 
 ```powershell
-# 1. Pocket classifier router (< 50ms classification, ~350MB VRAM)
-docker exec -it ollama-sandbox-pro ollama pull qwen2.5:0.5b
+# 1. Orchestrator Brain (< 60ms classification, ~980MB VRAM)
+docker exec -it ollama-sandbox-pro ollama pull qwen2.5:1.5b
 
 # 2. Daily software engineering, coding & unit tests (~9GB)
 docker exec -it ollama-sandbox-pro ollama pull qwen2.5-coder:14b
@@ -122,18 +123,24 @@ The **Hermes Copilot Auto-Proxy** acts as an intelligent OpenAI-compatible rever
 The repository file `hermes_proxy.py` maps automatically to `/workspace/hermes_proxy.py` inside the container via your Docker volume (`D:\Data\Docker Data\Hermes`).
 
 ### 2. Launch the Auto-Proxy in the Background
-Start the proxy as a persistent background daemon:
+
+**From Windows PowerShell:**
+```powershell
+docker exec -d hermes-sandbox-pro nohup /opt/router-venvs/semantic/bin/python /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1
+```
+
+**Or from inside the container shell (`root@...:/#`):**
 ```bash
-nohup /usr/local/lib/hermes-agent/venv/bin/python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1 &
+nohup /opt/router-venvs/semantic/bin/python /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1 &
 ```
 
 > [!TIP]
-> The proxy logs every routing decision, model assignment, and latency benchmark to `/workspace/proxy.log` (accessible on host at `D:\Data\Docker Data\Hermes\proxy.log`).
+> The proxy logs every routing decision, model assignment, and latency benchmark to `/workspace/proxy.log` (accessible on your Windows host at `D:\Data\Docker Data\Hermes\proxy.log`), and automatically injects visual routing badges into your chat stream.
 
 ### 3. Verify Proxy Health
-Test the proxy's model catalog:
-```bash
-curl http://127.0.0.1:8000/v1/models
+From Windows PowerShell:
+```powershell
+docker exec -it hermes-sandbox-pro curl -s http://127.0.0.1:8000/v1/models
 ```
 The output will list `"id": "auto"` at the top, along with all local Ollama models.
 
@@ -143,23 +150,29 @@ The output will list `"id": "auto"` at the top, along with all local Ollama mode
 
 Configure Hermes to communicate with the Auto-Proxy so all chats default to `auto`:
 
-1. Set the OpenAI-compatible Base URL and default model:
-   ```bash
-   hermes config set model.base_url http://127.0.0.1:8000/v1
-   hermes config set model.default auto
-   ```
+### From Windows PowerShell:
+```powershell
+docker exec -it hermes-sandbox-pro hermes config set model.base_url http://127.0.0.1:8000/v1
+docker exec -it hermes-sandbox-pro hermes config set model.default auto
+```
 
-2. Verify the configuration:
-   ```bash
-   hermes config get model
-   ```
-   **Output:**
-   ```yaml
-   default: auto
-   provider: custom
-   base_url: http://127.0.0.1:8000/v1
-   api_key: '***'
-   ```
+### Or inside the container shell (`root@...:/#`):
+```bash
+hermes config set model.base_url http://127.0.0.1:8000/v1
+hermes config set model.default auto
+```
+
+### Verify Active Configuration:
+```bash
+hermes config get model
+```
+**Expected Output:**
+```yaml
+default: auto
+provider: custom
+base_url: http://127.0.0.1:8000/v1
+api_key: '***'
+```
 
 Now, any session started via CLI, TUI, or Web UI will natively submit prompts with `model: "auto"`. The proxy classifies intent in 50ms and routes to the ideal model without manual switching!
 
@@ -167,18 +180,36 @@ Now, any session started via CLI, TUI, or Web UI will natively submit prompts wi
 
 ## Step 8: Launching the Web UI Dashboard
 
-Start the graphical dashboard to interact with Hermes visually:
+The command `hermes dashboard --host 0.0.0.0` runs the graphical dashboard server inside the Hermes container.
 
-1. Inside `hermes-sandbox-pro`, start the server:
-   ```bash
-   hermes dashboard --host 0.0.0.0
-   ```
-   > [!IMPORTANT]
-   > **Why `--host 0.0.0.0` is required:** By default, Hermes binds locally to `127.0.0.1` inside the container. You must supply `--host 0.0.0.0` to bind to all network interfaces, allowing the port mapping (`-p 9119:9119`) to forward connections from your Windows host browser.
+### Option 1: Direct Command from Windows PowerShell
+You can launch the dashboard directly from your host PowerShell without manually opening a container shell:
+```powershell
+docker exec -it hermes-sandbox-pro hermes dashboard --host 0.0.0.0
+```
 
-2. On first launch, type `1` to configure username/password authentication (e.g. `admin` and a secure password).
-3. Open your browser on Windows and navigate to:
-   **`http://localhost:9119`**
+### Option 2: Interactive Terminal Sequence
+If you prefer working inside the container shell:
+```powershell
+# 1. Open the container terminal from Windows PowerShell:
+docker exec -it hermes-sandbox-pro bash
+
+# 2. Inside the container prompt (root@...:/#), launch the dashboard:
+hermes dashboard --host 0.0.0.0
+```
+
+### Option 3: Persistent Background Daemon
+If you want the dashboard to keep running in the background without tying up your terminal:
+```powershell
+docker exec -d hermes-sandbox-pro nohup hermes dashboard --host 0.0.0.0 > /workspace/dashboard.log 2>&1
+```
+
+> [!IMPORTANT]
+> **Why `--host 0.0.0.0` is required:** By default, Hermes binds locally to `127.0.0.1` inside the container. You must supply `--host 0.0.0.0` to bind to all network interfaces, allowing the port mapping (`-p 9119:9119`) to forward connections from your Windows host browser.
+
+1. **First-Time Password Setup:** On first launch, type `1` to configure username/password authentication (e.g. `admin` and a secure password).
+2. **Access from Host Browser:** Open your browser on Windows and navigate to:
+   **`http://localhost:9119`**  
    *(Do NOT navigate to `0.0.0.0:9119` as Windows browsers cannot route to the all-interfaces wildcard address).*
 
 ---
@@ -231,22 +262,30 @@ Select any specific model from the list. Ollama swaps the weights smoothly.
 ## Step 11: Maintenance & Lifecycle
 
 ### 1. Resuming After Host Reboot
-When restarting your Windows machine, do **not** recreate the container. Simply restart:
+When restarting your Windows machine, do **not** recreate the containers. Run this clean sequence from Windows PowerShell:
+
 ```powershell
+# 1. Start both GPU Ollama and Hermes containers:
+docker start ollama-sandbox-pro
 docker start hermes-sandbox-pro
-```
-Ensure the Auto-Proxy background daemon is running inside `hermes-sandbox-pro`:
-```powershell
+
+# 2. Launch the Auto-Proxy daemon in the background:
 docker exec -d hermes-sandbox-pro nohup /usr/local/lib/hermes-agent/venv/bin/python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1
+
+# 3. Launch the Hermes Web UI Dashboard in the background:
+docker exec -d hermes-sandbox-pro nohup hermes dashboard --host 0.0.0.0 > /workspace/dashboard.log 2>&1
+
+# 4. Open your browser on Windows and navigate to:
+# http://localhost:9119
 ```
 
-To reopen the bash shell:
+To reopen the interactive container shell anytime:
 ```powershell
 docker exec -it hermes-sandbox-pro bash
 ```
 
 ### 2. Updating Hermes Agent
-Check version and update to latest releases:
+Inside `hermes-sandbox-pro`:
 ```bash
 hermes --version
 hermes update

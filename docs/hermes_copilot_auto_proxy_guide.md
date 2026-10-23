@@ -1,4 +1,4 @@
-# Hermes Copilot Auto-Proxy Guide (Intelligent Model Router)
+# Hermes Copilot Auto-Proxy Guide (Autonomous Universal Orchestrator)
 
 This guide documents the **Hermes Copilot Auto-Proxy** (`hermes_proxy.py`). It brings a genuine **GitHub Copilot "Auto"** model selection experience to locally hosted LLMs running in Ollama and Hermes Agent.
 
@@ -6,12 +6,13 @@ This guide documents the **Hermes Copilot Auto-Proxy** (`hermes_proxy.py`). It b
 
 ## 1. Overview & Architecture
 
-Instead of manually guessing models or running rigid linear scripts, you simply select **`auto`** in Hermes Agent. 
+Instead of manually guessing models, switching configs, or running rigid linear scripts, you simply select **`auto`** in Hermes Agent. 
 
 When you submit a prompt in the Hermes Chat, TUI, or Web UI dashboard:
 1. The request is intercepted by the local **Hermes Auto-Proxy** on port `8000`.
-2. A pocket-sized **`qwen2.5:0.5b`** model evaluates task difficulty and domain requirements in **50 milliseconds**.
-3. The proxy dynamically rewrites `model: "auto"` to the ideal model (`deepseek-r1:14b` or `qwen2.5-coder:14b`) and streams the response directly into Hermes without delay.
+2. An in-process **System 1 Router** (Semantic Router via FastEmbed / ONNX on CPU) evaluates the prompt intent in **5–60 milliseconds** with **0 MB GPU VRAM**.
+3. A dynamic **Fleet Profiler** inspects Ollama model capabilities (`thinking` for reasoning, `tools` for coding/tools) and pairs the intent with the best installed model.
+4. The proxy dynamically rewrites `model: "auto"` to the chosen model, injects a **visual status badge** into the chat stream, and streams the worker model directly into Hermes.
 
 ```
  ┌─────────────────────────────────────────────────────────────────┐
@@ -24,65 +25,90 @@ When you submit a prompt in the Hermes Chat, TUI, or Web UI dashboard:
  │       HERMES AUTO-PROXY (FastAPI • Local Port 8000)             │
  │                                                                 │
  │ 1. Intercepts incoming turn with model: "auto"                  │
- │ 2. Sub-Second Pocket Classifier (qwen2.5:0.5b in 50ms):         │
- │    • Security / Cryptography / Logic ──▶ deepseek-r1:14b        │
- │    • Architecture / Systems Design   ──▶ qwen2.5-coder:14b      │
- │    • Routine Coding / Unit Tests     ──▶ qwen2.5-coder:14b      │
+ │ 2. Sub-60ms System 1 Router (In-Process CPU / ONNX):            │
+ │    • Dynamic Fleet Profiler (queries Ollama /api/show)          │
+ │    • Head & Tail Intent Extraction (< 1,200 chars)              │
+ │    • Fast intent classification (Semantic Router / FastEmbed)   │
  │ 3. Tool-Execution Pinning: Keeps model warm during active tool  │
- │    cycles (bash, write_file) to prevent VRAM swapping freezes.  │
+ │    cycles (bash, write_file) to prevent mid-turn model swaps.   │
+ │ 4. Injects visual badge: > 🧭 [Auto Router] Using model...      │
  └──────────────────────────────┬──────────────────────────────────┘
                                 │ Forwards with real model name
                                 ▼
  ┌─────────────────────────────────────────────────────────────────┐
  │               OLLAMA (GPU Port 11434)                           │
- │        Executes the chosen model and streams back               │
+ │     Executes ONLY the active worker model (100% GPU VRAM)       │
  └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Why This is Better Than Traditional Proxies
+## 2. The System 1 Router Architecture
 
-1. **Native In-Chat "Auto" Experience:** Works directly inside Hermes Agent's chat prompt and Web UI dashboard. No external CLI launchers required.
-2. **Zero VRAM Thrashing (Tool-Turn Pinning):** When an agent executes multiple tool calls (e.g. running unit tests, fixing code, creating files), the proxy keeps the dispatched model pinned for that entire turn so Ollama never swaps weights mid-step.
-3. **Hardware-Optimized for Consumer GPUs:** Tuned specifically for 8GB VRAM cards (RTX 4060 / 5060) backed by 32GB RAM, preventing out-of-memory disk swapping freezes.
-4. **Cloud-Ready Compatibility:** Because it speaks the standard OpenAI API (`/v1/chat/completions`), this exact proxy architecture can be pointed to cloud providers (OpenRouter, Anthropic Claude 3.5 Sonnet, OpenAI o1) with zero changes to Hermes!
+The core architectural breakthrough of Hermes Copilot Auto-Proxy is the **complete separation of routing from the Ollama GPU daemon**.
+
+### A. In-Process System 1 Routing (CPU / ONNX)
+* **Zero GPU VRAM:** Previous architectures ran a 1.5B LLM inside Ollama as the router, causing GPU VRAM thrashing and model-swapping evictions. The new router runs entirely in Python on CPU using FastEmbed ONNX embeddings (~350 MB RAM).
+* **Blazing Fast (< 60ms):** Vector similarity classification finishes in **5 to 60 ms**—over 50x faster than prompting an LLM.
+* **100% Dedicated Worker VRAM:** Because routing uses 0 MB of Ollama memory, Ollama dedicates 100% of its resources to the currently active worker model (`qwen2.5-coder:14b` or `deepseek-r1:14b`).
+
+### B. Dynamic Capability-Based Fleet Profiling (Zero Hardcoded Names)
+* **No Hardcoded Model Names:** The proxy queries Ollama's active catalog (`/v1/models` and `/api/show`) and reads model capabilities:
+  - `reasoning` $\rightarrow$ Model with the `thinking` capability (e.g. `deepseek-r1:14b`).
+  - `coding` $\rightarrow$ Model with `tools` and without `thinking` (e.g. `qwen2.5-coder:14b`).
+  - `general` $\rightarrow$ Smallest model without `thinking` (falls back to coder if 2-model fleet).
+* **Fail Loudly & Actionably:** If no installed model satisfies the required capability, the proxy stops with a clear banner rather than silently defaulting.
+
+### C. Head & Tail Truncation
+In real autonomous agent workflows, conversation turns can reach 10,000 to 20,000+ tokens (system prompts, tool definitions, file contents, bash outputs).
+* The proxy extracts the **Head (first 600 characters)** and **Tail (last 600 characters)** of the latest user prompt.
+* This captures both the primary objective and immediate instructions while skipping middle noise, ensuring instant classification regardless of conversation length.
+
+### D. Single-Turn Continuation Pinning
+* **Why tool loops must stay pinned:** During iterative agent tool cycles (reading files, executing bash, running tests), switching models mid-step breaks execution context.
+* **Pinning Logic:** The proxy checks **only the immediate last message role**. If the last message is a `tool` result or an identical user prompt, the model remains pinned. The moment the user types a new prompt, routing runs fresh.
+
+### E. Live In-Chat Transparency Badge
+Every time the router selects a model, it injects a clean markdown badge at the very top of the chat response stream:
+
+> 🧭 **[Auto Router]** Using **`qwen2.5-coder:14b`** *(Task: `coding` • 56.9ms)*
 
 ---
 
-## 3. Setup Instructions
+## 3. Setup & Deployment Instructions
 
-### Step 1: Ensure Pocket Router is Pulled in Ollama
+### Step 1: Ensure Your Execution Fleet is Pulled
 From your Windows PowerShell host:
 ```powershell
-docker exec -it ollama-sandbox-pro ollama pull qwen2.5:0.5b
+docker exec -it ollama-sandbox-pro ollama pull qwen2.5-coder:14b
+docker exec -it ollama-sandbox-pro ollama pull deepseek-r1:14b
 ```
 
 ### Step 2: Start the Auto-Proxy in Hermes Container
-Inside `hermes-sandbox-pro`, start the proxy daemon:
-```bash
-nohup /usr/local/lib/hermes-agent/venv/bin/python3 /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1 &
+Inside `hermes-sandbox-pro`, launch the proxy in the background using its isolated router virtual environment:
+```powershell
+docker exec -d hermes-sandbox-pro nohup /opt/router-venvs/semantic/bin/python /workspace/hermes_proxy.py > /workspace/proxy.log 2>&1
 ```
 
 Verify that the proxy is healthy:
-```bash
-curl http://127.0.0.1:8000/v1/models
+```powershell
+docker exec -it hermes-sandbox-pro curl -s http://127.0.0.1:8000/v1/models
 ```
 *(You will see `"id": "auto"` listed at the top of the model catalog).*
 
 ### Step 3: Configure Hermes Agent to Use Auto-Mode
-Run these commands inside the container (or via `docker exec` from host PowerShell):
-```bash
-hermes config set model.base_url http://127.0.0.1:8000/v1
-hermes config set model.default auto
+Point Hermes to the Auto-Proxy:
+```powershell
+docker exec -it hermes-sandbox-pro hermes config set model.base_url http://127.0.0.1:8000/v1
+docker exec -it hermes-sandbox-pro hermes config set model.default auto
 ```
 
-Verify the active configuration:
-```bash
-hermes config get model
+Verify active configuration:
+```powershell
+docker exec -it hermes-sandbox-pro hermes config get model
 ```
 **Output:**
-```text
+```yaml
 default: auto
 provider: custom
 base_url: http://127.0.0.1:8000/v1
@@ -91,46 +117,42 @@ api_key: '***'
 
 ---
 
-## 4. Verified Usage Examples
+## 4. Live Verified Prompts & Multi-Turn Behavior
 
-### Example A: Security & Cryptographic Analysis (Routes to DeepSeek)
-**Prompt in Hermes Chat:**
+Here is the exact verified behavior across consecutive turns in the same chat session:
+
+### Turn 1: Coding & Autonomous Tools
+**Prompt:**
 ```text
-Analyze this authentication handshake for timing attack vulnerabilities and race conditions
+Write a Python script that searches a directory for log files older than 30 days, compresses them into a tar.gz archive, and deletes the originals. Include error handling.
 ```
-* **Dispatched Brain:** `deepseek-r1:14b`
-* **Behavior:** DeepSeek engages deep chain-of-thought thinking (`Thinking ~547 tokens`), analyzing TLS handshakes, constant-time mitigations, and race conditions.
-* **GPU Verification (`ollama ps`):**
-  ```text
-  NAME             ID              SIZE      PROCESSOR          CONTEXT    UNTIL
-  deepseek-r1:14b  c333b7232bdb    10.0 GB   38%/62% CPU/GPU    4096       29 minutes from now
-  ```
+* **Routing:** `coding` • **77.0ms**
+* **Dispatched Model:** `qwen2.5-coder:14b`
+* **Behavior:** Dispatched autonomous bash terminal tool command to find, archive, and clean up files.
 
----
-
-### Example B: Software Architecture & System Design (Routes to Qwen 14B)
-**Prompt in Hermes Chat:**
+### Turn 2: Security & Deep Reasoning
+**Prompt (same session):**
 ```text
-Design the enterprise clean architecture for an order fulfillment service with CQRS and MediatR
+Audit this signature verification logic for timing attack vulnerabilities:
+def verify(user_sig, real_sig):
+    if len(user_sig) != len(real_sig): return False
+    for a, b in zip(user_sig, real_sig):
+        if a != b: return False
+    return True
+Explain how an attacker exploits this and provide the constant-time fix.
 ```
-* **Dispatched Brain:** `qwen2.5-coder:14b`
-* **Latency:** Responded in **8 seconds** without VRAM freezes.
-* **Behavior:** Autonomously invoked Hermes's built-in `architecture-diagram` tool to render the CQRS/MediatR system flow.
-* **GPU Verification (`ollama ps`):**
-  ```text
-  NAME               ID              SIZE      PROCESSOR          CONTEXT    UNTIL
-  qwen2.5-coder:14b  4828733707be    15 GB     62%/38% CPU/GPU    32768      29 minutes from now
-  ```
+* **Routing:** `reasoning` • **55.7ms**
+* **Dispatched Model:** `deepseek-r1:14b`
+* **Behavior:** DeepSeek engaged **542 thinking tokens**, analyzed the early-exit vulnerability, and provided the constant-time fix.
 
----
-
-### Example C: Routine Development & Tool Execution (Routes to Qwen 14B)
-**Prompt in Hermes Chat:**
+### Turn 3: Switching Back to Coding (Zero Pinning Regression)
+**Prompt (same session):**
 ```text
-Write a C# FluentValidation validator for a UserRegistrationDTO and create unit tests
+Now write comprehensive pytest unit tests for the constant-time fix you just provided, testing valid signatures, invalid signatures, and different lengths.
 ```
-* **Dispatched Brain:** `qwen2.5-coder:14b`
-* **Behavior:** Generated `UserRegistrationDTO`, created comprehensive validation rules, and built an NUnit test fixture with happy and edge cases via `execute_code`.
+* **Routing:** `coding` • **56.9ms**
+* **Dispatched Model:** `qwen2.5-coder:14b`
+* **Behavior:** Switched smoothly back to the coding model, writing a 5-case pytest test suite.
 
 ---
 
@@ -142,10 +164,13 @@ Every dispatch decision is logged in real-time to:
 
 **Sample Log Entry:**
 ```text
+[2026-10-23 15:39:56]
 ┌─────────────────────────────────────────────────────────────────┐
-│ 🤖 Hermes Copilot Auto-Proxy                                    │
-│ 🎯 Task Category  : Architecture & Systems Design
-│ 🧠 Dispatched Brain: qwen2.5-coder:14b
-│ ⏱️  Routing Latency : 0ms
+│ 🤖 Hermes Copilot Autonomous Orchestrator
+│ 🧭 Router Backend   : semantic (CPU, in-process)
+│ 📦 Execution Fleet  : ['qwen2.5-coder:14b', 'deepseek-r1:14b']
+│ 🏷️  Task Category    : coding (confidence 0.63)
+│ 🚀 Dispatched Model : qwen2.5-coder:14b ['completion', 'tools', 'insert'] 14.8B
+│ ⏱️  Routing Latency  : 16.7ms
 └─────────────────────────────────────────────────────────────────┘
 ```

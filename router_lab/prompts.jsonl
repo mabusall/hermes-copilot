@@ -1,0 +1,40 @@
+{"label": "coding", "prompt": "Write a Python function to validate an IPv4 address with regex and unit tests"}
+{"label": "coding", "prompt": "Refactor this C# service class to use dependency injection and add xUnit tests"}
+{"label": "coding", "prompt": "Create a FluentValidation validator for a UserRegistrationDTO in .NET"}
+{"label": "coding", "prompt": "Fix the NullReferenceException in my ASP.NET Core controller when the request body is empty"}
+{"label": "coding", "prompt": "Write a SQL query that returns the top 5 customers by total order value in the last 30 days"}
+{"label": "coding", "prompt": "Implement a REST endpoint in FastAPI for uploading a file and storing it in S3"}
+{"label": "coding", "prompt": "Convert this JavaScript callback-based code to async/await"}
+{"label": "coding", "prompt": "Add a Dockerfile and docker-compose.yml for a Node.js app with a Postgres database"}
+{"label": "coding", "prompt": "Write a bash script that backs up a folder to a timestamped tar.gz and deletes backups older than 7 days"}
+{"label": "coding", "prompt": "Design the clean architecture folder structure for an order fulfillment service with CQRS and MediatR"}
+{"label": "coding", "prompt": "Write unit tests with pytest for a function that parses CSV rows into dataclasses"}
+{"label": "coding", "prompt": "Implement a constant-time string comparison helper in C# for comparing API keys"}
+{"label": "coding", "prompt": "My React component re-renders infinitely when I call setState inside useEffect, fix it"}
+{"label": "coding", "prompt": "Write a regex to extract all email addresses from a text file and a Python script that uses it"}
+{"label": "coding", "prompt": "Create a GitHub Actions workflow that builds and tests a .NET 8 solution on every pull request"}
+{"label": "reasoning", "prompt": "Audit this HMAC-SHA256 signature verification function for timing attacks and constant-time safety"}
+{"label": "reasoning", "prompt": "Analyze this authentication handshake for timing attack vulnerabilities and race conditions"}
+{"label": "reasoning", "prompt": "Prove that the square root of 2 is irrational"}
+{"label": "reasoning", "prompt": "Is this double-checked locking implementation thread-safe under the Java memory model? Explain step by step"}
+{"label": "reasoning", "prompt": "A bat and a ball cost $1.10 in total. The bat costs $1 more than the ball. How much does the ball cost? Reason carefully"}
+{"label": "reasoning", "prompt": "Evaluate whether this JWT validation logic is vulnerable to algorithm confusion attacks"}
+{"label": "reasoning", "prompt": "What is the time complexity of this recursive algorithm? Prove it using the master theorem"}
+{"label": "reasoning", "prompt": "Find the flaw in this argument: all prime numbers are odd, therefore 2 is not prime"}
+{"label": "reasoning", "prompt": "Model the threat surface of a password reset flow that sends tokens via email and rank the risks"}
+{"label": "reasoning", "prompt": "Explain why this lock-free queue can suffer from the ABA problem and how to prove a fix is correct"}
+{"label": "reasoning", "prompt": "A train leaves at 3pm at 60 km/h and another leaves the same station at 4pm at 90 km/h on the same track. When does the second catch up? Show your reasoning"}
+{"label": "reasoning", "prompt": "Is the Diffie-Hellman exchange in this protocol vulnerable to a man-in-the-middle attack? Analyze the assumptions"}
+{"label": "reasoning", "prompt": "Determine whether this smart contract withdraw function is vulnerable to reentrancy and explain the attack sequence"}
+{"label": "reasoning", "prompt": "Prove by induction that the sum of the first n odd numbers is n squared"}
+{"label": "reasoning", "prompt": "Analyze this token generator for predictability given that it seeds Random with the current time"}
+{"label": "general", "prompt": "hello, how are you?"}
+{"label": "general", "prompt": "Summarize the key differences between REST and GraphQL in three bullet points"}
+{"label": "general", "prompt": "What's a good name for a coffee shop that also sells books?"}
+{"label": "general", "prompt": "Translate 'good morning, see you tomorrow' into Spanish and French"}
+{"label": "general", "prompt": "Explain what Docker is to a non-technical manager"}
+{"label": "general", "prompt": "Write a short friendly email to my team announcing that Friday's meeting is moved to 3pm"}
+{"label": "general", "prompt": "What are the pros and cons of working remotely?"}
+{"label": "general", "prompt": "Give me a 3-day itinerary for visiting Istanbul"}
+{"label": "general", "prompt": "What does the acronym SOLID stand for?"}
+{"label": "general", "prompt": "thanks, that was helpful!"}

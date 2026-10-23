@@ -1,109 +1,129 @@
 #!/usr/bin/env python3
 """
-Hermes Copilot Auto-Proxy
+Hermes Copilot Auto-Proxy (Universal Autonomous Orchestrator)
 OpenAI-compatible reverse proxy providing GitHub Copilot "Auto" mode for local LLMs.
-Intercepts requests with model: "auto", classifies intent via qwen2.5:0.5b in ~50ms,
-and forwards to the optimal specialized model in Ollama with zero GPU thrashing.
+
+Routing is done by a pluggable System 1 backend that runs IN THIS PROCESS on CPU
+(ROUTER_BACKEND = semantic | routellm | laya | ollama-llm). The backend returns a task
+category; routers/fleet.py maps it to an installed Ollama model using the capabilities
+Ollama reports. Ollama itself only ever runs the worker model.
+No hardcoded model names. No silent fallbacks. 100% dynamic.
 """
 
 import os
-import sys
 import json
 import time
-import httpx
+import asyncio
 from typing import Optional, Dict, Any, List
+
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 import uvicorn
 
+from routers import get_backend, extract_routing_intent
+from routers.fleet import Fleet, FleetError
+
 OLLAMA_BASE = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434")
-ROUTER_MODEL = "qwen2.5:0.5b"
 PROXY_HOST = "0.0.0.0"
 PROXY_PORT = 8000
+ROUTER_BACKEND = os.getenv("ROUTER_BACKEND", "semantic")
+LOG_FILE = os.getenv("PROXY_LOG_FILE", "/workspace/proxy.log")
+DEBUG_ROLES = os.getenv("PROXY_DEBUG_ROLES", "1") == "1"        # log message structure (no content) per request
 
-app = FastAPI(title="Hermes Copilot Auto-Proxy")
+app = FastAPI(title="Hermes Copilot Universal Autonomous Proxy")
 
-# State to avoid VRAM thrashing during tool execution
-current_pinned_model: str = "qwen2.5-coder:14b"
+backend = get_backend(ROUTER_BACKEND)
+fleet = Fleet(OLLAMA_BASE)
+
+backend_load_task: Optional[asyncio.Task] = None
+backend_load_error: Optional[str] = None
+
+# Turn state: avoids re-routing (and model swaps) inside one tool loop
+current_pinned_model: Optional[str] = None
+last_evaluated_prompt: Optional[str] = None
 
 
-async def get_available_models(client: httpx.AsyncClient) -> List[str]:
-    """Dynamically queries Ollama for active models, filtering out router and oversized models."""
+def log(text: str) -> None:
+    timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]")
+    output = f"\n{timestamp}\n{text}" if text.startswith("┌") else f"{timestamp} {text}"
+    print(output, flush=True)
     try:
-        r = await client.get(f"{OLLAMA_BASE}/v1/models", timeout=3.0)
-        if r.status_code == 200:
-            data = r.json()
-            models = [m["id"] for m in data.get("data", [])]
-            # Exclude router model (0.5b) and heavy 32b+ models to protect 8GB VRAM consumer setups
-            return [
-                m for m in models 
-                if not m.startswith("qwen2.5:0.5b") and "32b" not in m and "70b" not in m
-            ]
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(output + "\n")
     except Exception:
         pass
-    return ["qwen2.5-coder:14b", "deepseek-r1:14b"]
 
 
-async def classify_prompt(prompt: str, available_models: List[str], client: httpx.AsyncClient) -> Dict[str, str]:
-    """Uses qwen2.5:0.5b to classify task intent in ~50ms."""
-    p_lower = prompt.lower()
+def banner(lines: List[str]) -> str:
+    bar = "─" * 65
+    return "\n".join([f"┌{bar}┐"] + [f"│ {line}" for line in lines] + [f"└{bar}┘"]) + "\n"
 
-    # Rule-based fast paths for zero-latency classification
-    if any(k in p_lower for k in ["security", "vulnerability", "race condition", "timing attack", "exploit", "handshake"]):
-        if any("deepseek" in m or "r1" in m for m in available_models):
-            return {
-                "model": next(m for m in available_models if "deepseek" in m or "r1" in m),
-                "category": "Security & Logic",
-                "reason": "Security vulnerability and race-condition analysis"
-            }
 
-    if any(k in p_lower for k in ["enterprise architecture", "system design", "clean architecture", "domain-driven", "cqrs", "class hierarchy"]):
-        return {
-            "model": "qwen2.5-coder:14b",
-            "category": "Architecture & Systems Design",
-            "reason": "High-level software system design and enterprise patterns (optimized for 8GB GPU)"
+async def _load_backend() -> None:
+    global backend_load_error
+    t0 = time.perf_counter()
+    log(f"🔥 Loading router backend '{backend.name}' (CPU, in-process)...")
+    try:
+        await asyncio.to_thread(backend.load)
+        log(f"✅ Router backend '{backend.name}' ready in {time.perf_counter() - t0:.1f}s")
+    except Exception as e:
+        backend_load_error = f"{type(e).__name__}: {e}"
+        log(f"❌ Router backend '{backend.name}' failed to load: {backend_load_error}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Loads the router backend in the background; requests wait for it instead of failing."""
+    global backend_load_task
+    backend_load_task = asyncio.create_task(_load_backend())
+
+
+def make_error_stream(err_msg: str):
+    """Creates a clean OpenAI-compatible SSE error stream for the Hermes UI."""
+    async def err_stream():
+        chunk = {
+            "id": f"chatcmpl-err-{int(time.time())}",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": "auto",
+            "choices": [{
+                "index": 0,
+                "delta": {"role": "assistant", "content": err_msg},
+                "finish_reason": "stop"
+            }]
         }
+        yield f"data: {json.dumps(chunk)}\n\n"
+        yield "data: [DONE]\n\n"
+    return StreamingResponse(err_stream(), media_type="text/event-stream")
 
-    # Ask the pocket router (qwen2.5:0.5b) for nuanced classification
-    payload = {
-        "model": ROUTER_MODEL,
-        "prompt": f"""Classify task and select best model from: {json.dumps(available_models)}
-Guidelines:
-- Security, math, cryptographic logic -> deepseek-r1:14b
-- Architecture, system design, coding, unit tests, scripts -> qwen2.5-coder:14b
 
-Task: "{prompt}"
-JSON output (keys: selected_model, category, reason):""",
-        "format": "json",
-        "stream": False,
-        "options": {"temperature": 0.0, "num_predict": 100}
-    }
+def error_response(title: str, details: List[str], stream: bool, status: int, err_type: str):
+    log(banner([f"❌ Hermes Copilot Error: {title}"] + details))
+    msg = f"❌ **Hermes Copilot Error: {title}**\n\n" + "\n\n".join(details)
+    if stream:
+        return make_error_stream(msg)
+    return JSONResponse(status_code=status, content={"error": {"message": msg, "type": err_type}})
 
-    try:
-        r = await client.post(f"{OLLAMA_BASE}/api/generate", json=payload, timeout=5.0)
-        if r.status_code == 200:
-            res = json.loads(r.json().get("response", "{}"))
-            selected = res.get("selected_model", "")
-            if selected in available_models:
-                return {
-                    "model": selected,
-                    "category": res.get("category", "General"),
-                    "reason": res.get("reason", "Optimal task fit")
-                }
-    except Exception:
-        pass
 
-    # Safe default: Primary Daily Driver
-    return {
-        "model": "qwen2.5-coder:14b",
-        "category": "Routine Software Engineering",
-        "reason": "Default high-speed daily coding driver"
-    }
+def _text_of(content: Any) -> str:
+    if isinstance(content, list):
+        return " ".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+    return content if isinstance(content, str) else ""
+
+
+def _structure(messages: List[Dict[str, Any]]) -> str:
+    """Role sequence + extra keys, no content. Used to verify how Hermes formats tool turns."""
+    parts = []
+    for m in messages[-6:]:
+        extra = [k for k in m.keys() if k not in ("role", "content")]
+        parts.append(m.get("role", "?") + (f"{extra}" if extra else ""))
+    return f"{len(messages)} msgs, last 6: " + " → ".join(parts)
 
 
 @app.get("/v1/models")
 async def list_models():
-    """Returns Ollama models with 'auto' added as the default option."""
+    """Returns Ollama models with 'auto' dynamically prepended as the default choice."""
     async with httpx.AsyncClient() as client:
         try:
             r = await client.get(f"{OLLAMA_BASE}/v1/models", timeout=3.0)
@@ -126,58 +146,89 @@ async def list_models():
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
-    global current_pinned_model
-    body = await request.json()
-    model = body.get("model", "auto")
-    messages = body.get("messages", [])
-    stream = body.get("stream", False)
+    global current_pinned_model, last_evaluated_prompt
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": {"message": "Invalid JSON payload", "type": "invalid_request_error"}})
 
-    # If the user selected a specific model manually, respect it directly
+    model = body.get("model", "auto")
+    messages = body.get("messages", []) or []
+    stream = body.get("stream", False)
+    chat_badge: Optional[str] = None
+
+    # If the user selected a specific model manually via /model, respect it directly
     if model != "auto":
         target_model = model
     else:
-        # Check if this is an intermediate tool-turn (preserve current model to avoid VRAM thrashing)
-        last_message = messages[-1] if messages else {}
-        is_tool_continuation = last_message.get("role") in ("tool", "assistant")
+        user_texts = [_text_of(m.get("content")) for m in messages if m.get("role") == "user"]
+        latest_prompt = user_texts[-1] if user_texts else ""
+        last_role = messages[-1].get("role") if messages else None
 
-        if is_tool_continuation and current_pinned_model:
+        if DEBUG_ROLES:
+            log(f"🔎 Request: {_structure(messages)} | latest user: {latest_prompt[:60]!r}")
+
+        # Only the LAST message decides whether this is a tool-loop continuation.
+        # (The previous version scanned the whole history, which pinned every later prompt.)
+        is_tool_continuation = last_role == "tool"
+        is_same_prompt = bool(latest_prompt) and latest_prompt == last_evaluated_prompt
+
+        if (is_tool_continuation or is_same_prompt) and current_pinned_model:
             target_model = current_pinned_model
+            reason = "tool result" if is_tool_continuation else "same user prompt"
+            log(f"🔄 Reusing '{target_model}' ({reason}, no re-routing)")
         else:
-            # Extract latest user message
-            user_texts = []
-            for m in messages:
-                if m.get("role") == "user":
-                    content = m.get("content", "")
-                    if isinstance(content, list):
-                        text = " ".join([c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text"])
-                        user_texts.append(text)
-                    elif isinstance(content, str):
-                        user_texts.append(content)
-            latest_prompt = user_texts[-1] if user_texts else ""
+            # Wait for the backend if it is still loading
+            if backend_load_task and not backend_load_task.done():
+                await backend_load_task
+            if backend_load_error:
+                return error_response(
+                    "Router Backend Failed to Load",
+                    [f"Backend: `{backend.name}`", f"Reason: {backend_load_error}"],
+                    stream, 500, "router_load_error")
 
-            async with httpx.AsyncClient() as client:
-                available = await get_available_models(client)
-                start_t = time.time()
-                decision = await classify_prompt(str(latest_prompt), available, client)
-                elapsed_ms = int((time.time() - start_t) * 1000)
-
-            target_model = decision["model"]
-            current_pinned_model = target_model
-
-            log_banner = (
-                f"┌─────────────────────────────────────────────────────────────────┐\n"
-                f"│ 🤖 Hermes Copilot Auto-Proxy                                    │\n"
-                f"│ 🎯 Task Category  : {decision.get('category')}\n"
-                f"│ 🧠 Dispatched Brain: {target_model}\n"
-                f"│ ⏱️  Routing Latency : {elapsed_ms}ms\n"
-                f"└─────────────────────────────────────────────────────────────────┘\n"
-            )
-            print(log_banner, flush=True)
             try:
-                with open("/workspace/proxy.log", "a", encoding="utf-8") as f:
-                    f.write(log_banner + "\n")
-            except Exception:
-                pass
+                async with httpx.AsyncClient() as client:
+                    profiles = await fleet.profiles(client)
+            except Exception as e:
+                return error_response(
+                    "Cannot Read Ollama Fleet",
+                    [f"Ollama: `{OLLAMA_BASE}`", f"Reason: {type(e).__name__}: {e}"],
+                    stream, 502, "ollama_unreachable")
+            if not profiles:
+                return error_response(
+                    "No Execution Models Available",
+                    ["Ollama has no models to execute your task. Pull at least one model (e.g. qwen2.5-coder, deepseek-r1, llama)."],
+                    stream, 404, "no_models_available")
+
+            intent = extract_routing_intent(latest_prompt)
+            try:
+                decision = await asyncio.to_thread(backend.classify, intent)
+            except Exception as e:
+                return error_response(
+                    "Routing Failed",
+                    [f"Backend: `{backend.name}`", f"Reason: {type(e).__name__}: {e}"],
+                    stream, 500, "routing_error")
+
+            try:
+                chosen = Fleet.select(decision.category, profiles)
+            except FleetError as e:
+                return error_response("No Suitable Model", [str(e)], stream, 404, "no_suitable_model")
+
+            target_model = chosen.name
+            current_pinned_model = target_model
+            last_evaluated_prompt = latest_prompt
+
+            conf = f"{decision.confidence:.2f}" if decision.confidence is not None else "n/a"
+            chat_badge = f"> 🧭 **[Auto Router]** Using **`{target_model}`** *(Task: `{decision.category}` • {decision.latency_ms:.1f}ms)*\n\n"
+            log(banner([
+                "🤖 Hermes Copilot Autonomous Orchestrator",
+                f"🧭 Router Backend   : {backend.name} (CPU, in-process)",
+                f"📦 Execution Fleet  : {[p.name for p in profiles]}",
+                f"🏷️  Task Category    : {decision.category} (confidence {conf})",
+                f"🚀 Dispatched Model : {target_model} {chosen.capabilities} {chosen.params_b}B",
+                f"⏱️  Routing Latency  : {decision.latency_ms:.1f}ms",
+            ]))
 
     # Rewrite model name to the selected real Ollama model
     body["model"] = target_model
@@ -190,6 +241,19 @@ async def chat_completions(request: Request):
 
         async def stream_generator():
             try:
+                if chat_badge:
+                    badge_chunk = {
+                        "id": f"chatcmpl-badge-{int(time.time()*1000)}",
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": target_model,
+                        "choices": [{
+                            "index": 0,
+                            "delta": {"role": "assistant", "content": chat_badge},
+                            "finish_reason": None,
+                        }],
+                    }
+                    yield f"data: {json.dumps(badge_chunk)}\n\n".encode("utf-8")
                 async for chunk in resp.aiter_bytes():
                     yield chunk
             finally:
@@ -200,10 +264,15 @@ async def chat_completions(request: Request):
     else:
         resp = await client.post(f"{OLLAMA_BASE}/v1/chat/completions", json=body)
         await client.aclose()
-        return JSONResponse(content=resp.json(), status_code=resp.status_code)
+        resp_data = resp.json()
+        if chat_badge and "choices" in resp_data and resp_data["choices"]:
+            msg = resp_data["choices"][0].get("message", {})
+            if "content" in msg and msg["content"] is not None:
+                msg["content"] = chat_badge + msg["content"]
+        return JSONResponse(content=resp_data, status_code=resp.status_code)
 
 
 if __name__ == "__main__":
     print(f"🚀 Starting Hermes Copilot Auto-Proxy on http://{PROXY_HOST}:{PROXY_PORT}", flush=True)
-    print(f"🔗 Forwarding target: {OLLAMA_BASE}", flush=True)
+    print(f"🔗 Forwarding target: {OLLAMA_BASE} | Router backend: {ROUTER_BACKEND}", flush=True)
     uvicorn.run(app, host=PROXY_HOST, port=PROXY_PORT, log_level="warning")
