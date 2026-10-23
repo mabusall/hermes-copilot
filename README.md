@@ -143,14 +143,24 @@ Write a C# FluentValidation validator for a UserRegistrationDTO and create unit 
 
 ```text
 hermes-copilot/
-├── README.md                              # This file
+├── README.md                              # Project overview and quickstart
 ├── LICENSE                                # MIT License
 ├── .gitignore                             # Git ignore rules
-├── hermes_proxy.py                        # OpenAI-compatible Auto-Proxy router
-└── docs/
+├── hermes_proxy.py                        # OpenAI-compatible Auto-Proxy router with chat UI badges
+├── ROUTER_EVALUATION_PLAN.md              # Living evaluation plan & benchmark tracker
+├── routers/                               # System 1 router backends & dynamic fleet profiler
+│   ├── __init__.py                        # Lazy backend factory
+│   ├── base.py                            # Shared interfaces, Decision types & intent truncation
+│   ├── fleet.py                           # Dynamic Ollama capability profiler (zero hardcoding)
+│   └── semantic.py                        # Semantic Router backend (FastEmbed / ONNX)
+├── router_lab/                            # Benchmarking test suite & offline datasets
+│   ├── bench.py                           # Automated latency, RAM, and accuracy benchmark runner
+│   ├── prompts.jsonl                      # 40-prompt labeled evaluation benchmark suite
+│   └── results/                           # JSON benchmark output records
+└── docs/                                  # Comprehensive architecture and setup guides
     ├── hermes_docker_setup_guide.md       # Complete Hermes Docker setup & Auto-Proxy guide
     ├── ollama_docker_setup_guide.md       # GPU-accelerated Ollama setup & health checks
-    └── hermes_copilot_auto_proxy_guide.md # Detailed Auto-Proxy architecture & benchmarks
+    └── hermes_copilot_auto_proxy_guide.md # Detailed Auto-Proxy architecture & verified benchmarks
 ```
 
 ---
@@ -160,6 +170,7 @@ hermes-copilot/
 * 📖 [Hermes Docker Setup Guide](docs/hermes_docker_setup_guide.md)
 * 📖 [Ollama Docker Setup Guide](docs/ollama_docker_setup_guide.md)
 * 📖 [Hermes Copilot Auto-Proxy Technical Guide](docs/hermes_copilot_auto_proxy_guide.md)
+* 📋 [System 1 Router Evaluation Plan](ROUTER_EVALUATION_PLAN.md)
 
 ---
 
