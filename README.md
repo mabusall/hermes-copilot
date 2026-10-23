@@ -1,6 +1,7 @@
 # 🤖 Hermes Copilot: Auto Local Models Router & Proxy
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Author: Mohannad Abu Sall](https://img.shields.io/badge/Author-Mohannad%20Abu%20Sall-blue.svg)](https://github.com/mabusall)
 [![Hermes Agent](https://img.shields.io/badge/Agent-Hermes--Sandbox-orange.svg)](https://github.com/NousResearch/hermes-agent)
 [![Ollama](https://img.shields.io/badge/Engine-Ollama-black.svg)](https://ollama.com)
 [![Hardware](https://img.shields.io/badge/GPU-RTX%204060%20%2F%205060%20(8GB%20VRAM)-green.svg)](https://www.nvidia.com)
@@ -223,6 +224,16 @@ hermes-copilot/
 
 ---
 
+## 👤 Author & Maintainer
+
+**Mohannad Abu Sall**
+* GitHub: [@mabusall](https://github.com/mabusall)
+* Repository: [mabusall/hermes-copilot](https://github.com/mabusall/hermes-copilot)
+
+---
+
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE) — Copyright (c) 2026 **Mohannad Abu Sall**.
+
+Permission is granted under the MIT License terms requiring that the above copyright and author attribution notice be preserved in all copies or substantial portions of the Software.
