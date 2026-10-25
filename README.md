@@ -140,10 +140,12 @@ docker exec -it hermes-sandbox-pro bash /workspace/scripts/switch_router.sh stat
 ```
 
 ### 4. Configure Hermes Agent for Auto-Mode
-Point Hermes to the Auto-Proxy:
+Point Hermes to the Auto-Proxy as a custom local provider:
 ```powershell
+docker exec -it hermes-sandbox-pro hermes config set model.provider custom
 docker exec -it hermes-sandbox-pro hermes config set model.base_url http://127.0.0.1:8000/v1
 docker exec -it hermes-sandbox-pro hermes config set model.default auto
+docker exec -it hermes-sandbox-pro hermes config set model.api_key dummy
 ```
 
 ### 5. Launch the Web UI Dashboard

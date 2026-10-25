@@ -159,14 +159,18 @@ Configure Hermes to communicate with the Auto-Proxy so all chats default to `aut
 
 ### From Windows PowerShell:
 ```powershell
+docker exec -it hermes-sandbox-pro hermes config set model.provider custom
 docker exec -it hermes-sandbox-pro hermes config set model.base_url http://127.0.0.1:8000/v1
 docker exec -it hermes-sandbox-pro hermes config set model.default auto
+docker exec -it hermes-sandbox-pro hermes config set model.api_key dummy
 ```
 
 ### Or inside the container shell (`root@...:/#`):
 ```bash
+hermes config set model.provider custom
 hermes config set model.base_url http://127.0.0.1:8000/v1
 hermes config set model.default auto
+hermes config set model.api_key dummy
 ```
 
 ### Verify Active Configuration:

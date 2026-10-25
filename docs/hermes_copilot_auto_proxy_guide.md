@@ -135,10 +135,12 @@ docker exec -it hermes-sandbox-pro curl -s http://127.0.0.1:8000/v1/models
 *(You will see `"id": "auto"` listed at the top of the model catalog).*
 
 ### Step 3: Configure Hermes Agent to Use Auto-Mode
-Point Hermes to the Auto-Proxy:
+Point Hermes to the Auto-Proxy as a custom local provider:
 ```powershell
+docker exec -it hermes-sandbox-pro hermes config set model.provider custom
 docker exec -it hermes-sandbox-pro hermes config set model.base_url http://127.0.0.1:8000/v1
 docker exec -it hermes-sandbox-pro hermes config set model.default auto
+docker exec -it hermes-sandbox-pro hermes config set model.api_key dummy
 ```
 
 ---
